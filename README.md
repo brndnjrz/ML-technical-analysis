@@ -72,18 +72,44 @@ This Python script creates an **AI-powered technical stock analysis dashboard** 
    - Allows users to visualize complex stock data trends and patterns in an interactive manner.
 
 
+## **Setup Environment Using Anaconda(optional)**
+### Download and install [Anaconda](https://www.anaconda.com/download)
+1. Create an environment 
+```bash
+conda create --name <ENV_NAME>
+```    
+2. To activate this environment
+```bash
+conda activate <ENV_NAME>
+```
+3. To run the app in this environment
+```bash
+cd <PATH_TO_YOU_PROJECT>
+```
+   - Then follow steps in [How to Use the Dashboard](#how-to-use-the-dashboard)
+
+4. To deactivate an an active environment
+```bash
+conda deactivate <ENV_NAME>
+```
+
 
 ## **How to Use the Dashboard**
 
-1. Install the required libraries:
+1. Download [Ollama](https://ollama.com/) 
+   - Once installed open up terminal and run the following command (keep open)
+    ```bash
+    ollama run llama3.2-vision
+    ```
+2. Open another terminal and install the required libraries:
    ```bash
    pip install streamlit yfinance plotly ollama pandas
    ```
-2. Run the app 
+3. Run the app 
     ```bash
     streamlit run app.py
     ```
-3. Interact with the dashboard:
+4. Interact with the dashboard:
    - Input a stock ticker (e.g., AAPL)
    - Select a date range.
    - Choose indicators to overlay on the chart.
