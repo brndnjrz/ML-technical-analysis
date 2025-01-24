@@ -88,3 +88,12 @@ This Python script creates an **AI-powered technical stock analysis dashboard** 
    - Select a date range.
    - Choose indicators to overlay on the chart.
    - Run AI analysis to get recommendations.
+
+## **Disclaimer**
+
+### For Educational Purposes Only
+- Does not constitute financial or investing advice 
+### AI/LLM Technology is Experimental
+- Outputs may contain inaccuracies or misleading information
+### Use Critical Thinking
+- Always verify conclusions and make informed decisions
