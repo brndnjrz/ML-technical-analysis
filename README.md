@@ -78,3 +78,13 @@ This Python script creates an **AI-powered technical stock analysis dashboard** 
 1. Install the required libraries:
    ```bash
    pip install streamlit yfinance plotly ollama pandas
+   ```
+2. Run the app 
+    ```bash
+    streamlit run app.py
+    ```
+3. Interact with the dashboard:
+   - Input a stock ticker (e.g., AAPL)
+   - Select a date range.
+   - Choose indicators to overlay on the chart.
+   - Run AI analysis to get recommendations.
