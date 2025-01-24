@@ -3,7 +3,7 @@
 ## **Overview**
 This Python script creates an **AI-powered technical stock analysis dashboard** using Streamlit, Plotly, and various technical analysis tools. Below is a detailed explanation of what the code does and its use cases.
 
----
+
 
 ## **What the Code Does**
 
@@ -13,20 +13,20 @@ This Python script creates an **AI-powered technical stock analysis dashboard** 
 - A title is displayed: *"AI-Powered Technical Stock Analysis Dashboard"*.
 - A sidebar is included for configuration options.
 
----
+
 
 ### **2. Inputs for Stock Ticker and Date Range**
 - Users can enter a stock ticker (e.g., "AAPL") in a text box.
 - Start and end dates can be selected for fetching historical stock data.
 - The `st.sidebar.button("Fetch Data")` button triggers the fetching of data using **Yahoo Finance** (`yfinance`).
 
----
+
 
 ### **3. Fetch and Display Stock Data**
 - The stock data is retrieved using `yf.download()` for the specified date range.
 - The data is stored in `st.session_state` for state persistence.
 
----
+
 
 ### **4. Plot a Candlestick Chart**
 - A candlestick chart of the stock's open, high, low, and close prices is created using **Plotly**.
@@ -37,7 +37,7 @@ This Python script creates an **AI-powered technical stock analysis dashboard** 
   - **Bollinger Bands**: Bands around the SMA showing volatility.
   - **VWAP (Volume Weighted Average Price)**: Weighted average price based on volume.
 
----
+
 
 ### **5. AI-Powered Analysis**
 - Uses the `ollama` library (LLaMA 3.2 Vision) for analyzing stock charts.
@@ -47,12 +47,12 @@ This Python script creates an **AI-powered technical stock analysis dashboard** 
   - The AI model analyzes the chart and provides a **buy/hold/sell recommendation** with reasoning.
 - The result is displayed on the Streamlit dashboard.
 
----
+
 
 ### **6. Temporary File Management**
 - Temporary files used for saving the chart are cleaned up after use to avoid clutter.
 
----
+
 
 ## **Use Cases**
 
@@ -71,7 +71,7 @@ This Python script creates an **AI-powered technical stock analysis dashboard** 
 5. **Data Visualization:**
    - Allows users to visualize complex stock data trends and patterns in an interactive manner.
 
----
+
 
 ## **How to Use the Dashboard**
 
