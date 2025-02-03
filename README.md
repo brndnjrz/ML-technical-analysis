@@ -103,7 +103,7 @@ conda deactivate <ENV_NAME>
     ```
 2. Open another terminal and install the required libraries:
    ```bash
-   pip install streamlit yfinance plotly ollama pandas
+   pip install streamlit plotly ollama pandas yfinance==0.2.40
    ```
 3. Run the app 
     ```bash
