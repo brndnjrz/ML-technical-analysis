@@ -21,7 +21,8 @@ end_date = st.sidebar.date_input("End Date", value=pd.to_datetime("2024-12-14"))
 
 # Fetch stock data
 if st.sidebar.button("Fetch Data"):
-    st.session_state["stock_data"] = yf.download(ticker, start=start_date, end=end_date)
+    st.session_state["stock_data"] = stock.history(start=start_date, end=end_date, auto_adjust=False)
+    # st.session_state["stock_data"] = yf.download(ticker, start=start_date, end=end_date)
     st.success("Stock data loaded successfully!")
 
 # Check if data is available
