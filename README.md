@@ -4,6 +4,15 @@
 This Python script creates an **AI-powered technical stock analysis dashboard** using Streamlit, Plotly, and various technical analysis tools. Below is a detailed explanation of what the code does and its use cases.
 
 
+### **Libraries Used**
+- `streamlit`: Used to build the web interface
+- `yfinance`: Used to download historical stock data from Yahoo Finance
+- `pandas`: Used for data manipulation and working with time series.
+- `plotly.graph_objects`: Used to create the interactive candlestick chart. 
+- `ollama`: Used to send images and prompts to an AI model (LLaMA 3.2 Vision) for stock chart analysis 
+- `tempfile`, `base4`, `os`: Handle temporary file creation, encoding chart images, and file cleanup.
+
+
 
 ## **What the Code Does**
 
