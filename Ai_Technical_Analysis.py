@@ -9,29 +9,32 @@ import tempfile
 import base64
 import os
 
-# Set up Streamlit app
-st.set_page_config(layout="wide")
-st.title("AI-Powered Technical Stock Analysis Dashboard")
-st.sidebar.header("Configuration")
+# Set up Streamlit App UI
+st.set_page_config(layout="wide")   # Page layout set to full width
+st.title("AI-Powered Technical Stock Analysis Dashboard")   # Displays the title at the top 
+st.sidebar.header("Configuration")  # Header in the sidebar
 
-# Input for stock ticker and date range
-ticker = st.sidebar.text_input("Enter Stock Ticker (e.g., AAPL):", "AAPL")
-start_date = st.sidebar.date_input("Start Date", value=pd.to_datetime("2023-01-01"))
+# Sidebar Input 
+ticker = st.sidebar.text_input("Enter Stock Ticker (e.g., AAPL):", "AAPL")  # Stock ticker input 
+start_date = st.sidebar.date_input("Start Date", value=pd.to_datetime("2023-01-01"))    # Allows user to select start and end date
 end_date = st.sidebar.date_input("End Date", value=pd.to_datetime("2024-12-14"))
 
-# Fetch stock data
-if st.sidebar.button("Fetch Data"):
-    st.session_state["stock_data"] = yf.download(ticker, start=start_date, end=end_date)
+# Fetch and Store Stock Data
+if st.sidebar.button("Fetch Data"): # When user clicks Fetch Data
+    stock = yf.Ticker(ticker)   # Creates a ticker object 
+    # Data is stored in st.session_state
+    st.session_state["stock_data"] = stock.history(start=start_date, end=end_date, auto_adjust=False)   # Fetches historical data between selected dates
+    # st.session_state["stock_data"] = yf.download(ticker, start=start_date, end=end_date)
     st.success("Stock data loaded successfully!")
 
 # Check if data is available
 if "stock_data" in st.session_state:
     data = st.session_state["stock_data"]
 
-    # Plot candlestick chart
+    # Plot Candlestick Chart
     fig = go.Figure(data=[
         go.Candlestick(
-            x=data.index,
+            x=data.index,   # data.index represents the x-axis (dates)
             open=data['Open'],
             high=data['High'],
             low=data['Low'],
@@ -40,23 +43,46 @@ if "stock_data" in st.session_state:
         )
     ])
 
-    # Sidebar: Select technical indicators
+    # Sidebar: Select Technical Indicators
     st.sidebar.subheader("Technical Indicators")
-    indicators = st.sidebar.multiselect(
+    indicators = st.sidebar.multiselect(    # Uses a multi-select dropdown
         "Select Indicators:",
         ["20-Day SMA", "20-Day EMA", "20-Day Bollinger Bands", "VWAP"],
         default=["20-Day SMA"]
     )
 
-    # Helper function to add indicators to the chart
+    # Function to Compute and Add Selected Indicators
     def add_indicator(indicator):
         if indicator == "20-Day SMA":
+            
+            # data['Close']: access the column of closing prices 
+            # .rolling(window=20).mean(): computes the 20-day simple moving average of the closing prices.
+            # go.Scatter(...): creates a line plot(mode='lines') of this moving average
+            # fig.add_trace(...): adds the SMA line to the candlestick chart
+            # Why its useful? 
+            #     Helps traders identify price trends over time 
+            
             sma = data['Close'].rolling(window=20).mean()
             fig.add_trace(go.Scatter(x=data.index, y=sma, mode='lines', name='SMA (20)'))
         elif indicator == "20-Day EMA":
+            
+            # .ewm(span=20).mean(): computes the exponential moving average using a 20-day span. Unlike SMA, EMA gives more weight to recent prices
+            # Why its useful? 
+            #     More responsive to recent price changes than SMA
+            
             ema = data['Close'].ewm(span=20).mean()
             fig.add_trace(go.Scatter(x=data.index, y=ema, mode='lines', name='EMA (20)'))
         elif indicator == "20-Day Bollinger Bands":
+            
+            # Calculates the Bollinger Bands
+            #     sma: 20-day simple moving average
+            #     std: 20-day standard deviation of closing prices
+            #     bb_upper: Upper band = SMA + 2 * std dev
+            #     bb_lower: Lower band = SMA + 2 * std dev
+            # Adds both upper and lower bands to the chart as separate lines
+            # Why its useful?
+            #     Helps visualize price volatility and potential breakout points 
+            
             sma = data['Close'].rolling(window=20).mean()
             std = data['Close'].rolling(window=20).std()
             bb_upper = sma + 2 * std
@@ -64,6 +90,15 @@ if "stock_data" in st.session_state:
             fig.add_trace(go.Scatter(x=data.index, y=bb_upper, mode='lines', name='BB Upper'))
             fig.add_trace(go.Scatter(x=data.index, y=bb_lower, mode='lines', name='BB Lower'))
         elif indicator == "VWAP":
+            
+            # VWAP formula
+            #     VWAP = ϵ(Close x Volume) / ϵ(Volume)
+            # .cumsum(): means cumulative sum over the entire dataset
+            # VWAP: gives the average price at which a stock has traded throughout the day, based on both price and volume
+            # Plots VWAP as a line on the chart
+            # Why its useful?
+            #     Institutional traders use it to determine whether they are getting a good price
+            
             data['VWAP'] = (data['Close'] * data['Volume']).cumsum() / data['Volume'].cumsum()
             fig.add_trace(go.Scatter(x=data.index, y=data['VWAP'], mode='lines', name='VWAP'))
 
@@ -71,14 +106,15 @@ if "stock_data" in st.session_state:
     for indicator in indicators:
         add_indicator(indicator)
 
-    fig.update_layout(xaxis_rangeslider_visible=False)
+    # Final Chart Formatting and display 
+    fig.update_layout(xaxis_rangeslider_visible=False)  # Hides the x-axis range slider 
     st.plotly_chart(fig)
 
     # Analyze chart with LLaMA 3.2 Vision
     st.subheader("AI-Powered Analysis")
-    if st.button("Run AI Analysis"):
+    if st.button("Run AI Analysis"):    # Adds a button that triggers the following 
         with st.spinner("Analyzing the chart, please wait..."):
-            # Save chart as a temporary image
+            # Saves the Plotly chart as a PNG in a temporary file
             with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmpfile:
                 fig.write_image(tmpfile.name)
                 tmpfile_path = tmpfile.name
