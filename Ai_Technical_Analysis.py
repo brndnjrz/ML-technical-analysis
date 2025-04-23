@@ -8,6 +8,7 @@ import ollama
 import tempfile
 import base64
 import os
+from pdf_generator import PDF
 
 # Set up Streamlit App UI
 st.set_page_config(layout="wide")   # Page layout set to full width
@@ -139,5 +140,33 @@ if "stock_data" in st.session_state:
             st.write("**AI Analysis Results:**")
             st.write(response["message"]["content"])
 
+            # PDF Report
+            pdf =PDF()
+            pdf.add_page()
+            pdf.add_chart(tmpfile_path)
+            pdf.add_analysis_text(response["message"]["content"])
+
+            # Save to a temporary file 
+            with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp_pdf:
+                pdf.output(tmp_pdf.name)
+                pdf_file_path = tmp_pdf.name
+
+            # Show the PDF preview in iframe
+            with open(pdf_file_path, "rb") as f:
+                base64_pdf = base64.b64encode(f.read()).decode('utf-8')
+                pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="600px" type="application/pdf"></iframe>'
+                st.markdown("### 📄 Preview AI Analysis Report")
+                st.markdown(pdf_display, unsafe_allow_html=True)
+
+            with open(pdf_file_path, "rb") as f:
+                st.download_button(
+                    label="⬇️Download PDF",
+                    data=f.read(),
+                    file_name=f'{ticker}_analysis.pdf',
+                    mime="application/pdf"
+                )
+
+
             # Clean up temporary file
             os.remove(tmpfile_path)
+            os.remove(pdf_file_path)
