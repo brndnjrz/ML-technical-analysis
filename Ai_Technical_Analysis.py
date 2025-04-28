@@ -20,8 +20,8 @@ import os
 from pdf_generator import PDF
 
 # Set up Streamlit App UI
-st.set_page_config(layout="wide")   # Page layout set to full width
-st.title("AI-Powered Technical Stock Analysis Dashboard")   # Displays the title at the top 
+st.set_page_config(page_title="AI Technical Analysis", layout="wide")   # Page layout set to full width
+st.title("Technical Stock Analysis Dashboard")   # Displays the title at the top 
 st.sidebar.header("Configuration")  # Header in the sidebar
 
 # Sidebar Input 
@@ -46,19 +46,31 @@ if st.sidebar.button("Fetch Data"): # When user clicks Fetch Data
 if "stock_data" in st.session_state:
     data = st.session_state["stock_data"]
 
-    # Calulate Indicators
+    # Calculate Indicators
+
+    # Implied Volatility (IV)
     data['returns'] = data['Close'].pct_change()
     data['volatility'] = data['returns'].rolling(window=21).std() * (252 ** 0.5)
+    
+    # Relative Strength Index (RSI)
     data['RSI'] = ta.rsi(data['Close'], length=14)
 
+    # MACD
     macd = ta.macd(data['Close'])
     data['MACD'] = macd['MACD_12_26_9']
     data['MACD_Signal'] = macd['MACDs_12_26_9']
 
+    # Moving Averages (Simple Moving Average and Exponential Moving Average)
     data['SMA_20'] = data['Close'].rolling(window=20).mean()
+    data['SMA_50'] = data['Close'].rolling(window=50).mean()
     data['EMA_20'] = data['Close'].ewm(span=20, adjust=False).mean()
+    data['EMA_50'] = data['Close'].ewm(span=50, adjust=False).mean()
+
+
+    # VWAP
     data['VWAP'] = (data['Close'] * data['Volume']).cumsum() / data['Volume'].cumsum()
 
+    # 20-day Bollinger Bands
     sma = data['Close'].rolling(window=20).mean()
     std = data['Close'].rolling(window=20).std()
     data['BB_upper'] = sma + 2 * std

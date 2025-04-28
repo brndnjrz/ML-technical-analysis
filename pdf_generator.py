@@ -5,7 +5,7 @@ class PDF(FPDF):
     def header(self):
         self.set_font("Arial", "B", 18)
         self.cell(0, 10, "AI-Powered Stock Analysis", ln=True, align="C")
-        self.ln(5)
+        self.ln(3)
 
     def footer(self):
         self.set_y(-15)
@@ -18,26 +18,32 @@ class PDF(FPDF):
         img_width, img_height = img.size
 
         # Set image display width (almost full page width)
-        display_width = 190  # Width in mm
+        max_display_width = 190  # Max width in mm
+        bottom_margin = 15 # same as footer
+        available_space = self.h - self.get_y() - bottom_margin # max height in mm 
 
-        # Calculate height proportionally to maintain aspect ratio
-        aspect_ratio = img_height / img_width
-        display_height = display_width * aspect_ratio
+        # Calculate scaling factors
+        scale_w = max_display_width / img_width
+        scale_h = available_space / img_height
 
-        # Had to add this bc there wasn't enough space for all the charts 
-        # Check if there's enough space for the image
-        bottom_margin = 15 # same as footer margin
-        available_space = self.h - self.get_y() - bottom_margin
+        # Use the smaller scale to fit both width and height
+        scale = min(scale_w, scale_h)
 
-        if display_height > available_space:
-            self.add_page
+        # Calculate final image size
+        final_width = img_width * scale 
+        final_height = img_height * scale
 
-        # Insert the image
-        self.image(chart_path, x=10, y=self.get_y(), w=display_width, h=display_height)
+        # Center the image horizontally 
+        x_position = (self.w - final_width) / 2
 
-        # Move the Y position after the image
-        self.set_y(self.get_y() + display_height + 5)  # Add small padding (5mm)
+        # Insert the scaled image 
+        self.image(chart_path, x=x_position, y=self.get_y(), w=final_width, h=final_height)
+
+        # Move Y position after the image
+        self.set_y(self.get_y() + final_height * 5)
+
 
     def add_analysis_text(self, text):
+        text = text.replace("*", "").replace("#", "")
         self.set_font("Arial", "", 12)
         self.multi_cell(0, 10, text)
