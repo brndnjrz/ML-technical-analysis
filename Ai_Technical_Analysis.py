@@ -71,10 +71,14 @@ if "stock_data" in st.session_state:
     data['VWAP'] = (data['Close'] * data['Volume']).cumsum() / data['Volume'].cumsum()
 
     # 20-day Bollinger Bands
-    sma = data['Close'].rolling(window=20).mean()
-    std = data['Close'].rolling(window=20).std()
-    data['BB_upper'] = sma + 2 * std
-    data['BB_lower'] = sma - 2 * std
+    bb = ta.bbands(data['Close'], length=20, std=2)
+    data['BB_upper'] = bb['BBU_20_2.0']
+    data['BB_lower'] = bb['BBL_20_2.0']
+    data['BB_middle'] = bb['BBM_20_2.0']
+
+    # Volume and Open
+    data['Volume'] = data['Volume']
+    data['Open'] = data['Open']
 
     # Setup Subplots: Candlestick + RSI + MACD + Volume
     row_count = 2 + int(show_rsi) + int(show_macd)  # Dynamic rows based on toggles 
@@ -107,7 +111,15 @@ if "stock_data" in st.session_state:
     st.sidebar.subheader("Technical Indicators (Candlestick)")
     indicators = st.sidebar.multiselect(    # Uses a multi-select dropdown
         "Select Indicators:",
-        ["20-Day SMA", "20-Day EMA", "20-Day Bollinger Bands", "VWAP"], default=["20-Day SMA"]
+        ["20-Day SMA",
+        "50-Day SMA", 
+        "20-Day EMA",
+        "50-Day EMA",
+        "Implied Volatility", 
+        "Bollinger Bands", 
+        "VWAP"
+        ], 
+        default=["20-Day SMA"]
     )
 
     # Function to Compute and Add Selected Indicators
@@ -166,13 +178,20 @@ if "stock_data" in st.session_state:
         # add_indicator(indicator)
         if indicator == "20-Day SMA":
             fig.add_trace(go.Scatter(x=data.index, y=data['SMA_20'], mode='lines', name='SMA 20'), row=current_row, col=1)
+        elif indicator == "50-Day SMA":
+            fig.add_trace(go.Scatter(x=data.index, y=data['SMA_50'], mode='lines', name='SMA 50'))
         elif indicator == "20-Day EMA":
             fig.add_trace(go.Scatter(x=data.index, y=data['EMA_20'], mode='lines', name='EMA 20'), row=current_row, col=1)
-        elif indicator == "20-Day Bollinger Bands":
-            fig.add_trace(go.Scatter(x=data.index, y=data['BB_upper'], mode='lines', name='BB Upper'), row=current_row, col=1)
-            fig.add_trace(go.Scatter(x=data.index, y=data['BB_lower'], mode='lines', name='BB Lower'), row=current_row, col=1)
+        elif indicator == "50-Day EMA":
+            fig.add_trace(go.Scatter(x=data.index, y=data['EMA_50'], mode='lines', name='EMA 50'))
         elif indicator == "VWAP":
             fig.add_trace(go.Scatter(x=data.index, y=data['VWAP'], mode='lines', name='VWAP'), row=current_row, col=1)
+        elif indicator == "Implied Volatility":
+            fig.add_trace(go.Scatter(x=data.index, y=data['volatility'], mode='lines', name='Implied Volatility'))
+        elif indicator == "Bollinger Bands":
+            fig.add_trace(go.Scatter(x=data.index, y=data['BB_upper'], mode='lines', name='BB Upper'))
+            fig.add_trace(go.Scatter(x=data.index, y=data['BB_lower'], mode='lines', name='BB Lower'))
+            fig.add_trace(go.Scatter(x=data.index, y=data['BB_middle'], mode='lines', name='BB Middle'))
 
     # --- Row 2: RSI (if selected) ---
     if show_rsi:
