@@ -2,5 +2,6 @@ import pandas as pd
 
 # Default settings for sidebar input
 DEFAULT_TICKER = "AAPL"
-DEFAULT_START_DATE = pd.to_datetime("2025-01-01")
-DEFAULT_END_DATE = pd.to_datetime("2025-06-01")
+# Start date is 3 months before today
+DEFAULT_START_DATE = pd.Timestamp.today() - pd.DateOffset(months=3)
+DEFAULT_END_DATE = pd.Timestamp.today()
