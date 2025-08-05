@@ -266,3 +266,125 @@ def create_chart(data, indicators, show_rsi, show_macd, levels,
     )
 
     return fig
+
+
+
+
+
+# Add this to your src/plotter.py file
+
+def create_enhanced_chart(data, indicators, levels, strategy_type=None, options_data=None, interval="1d"):
+    """
+    Enhanced chart function that matches the interface expected by the main app
+    
+    Args:
+        data (pd.DataFrame): Stock price data with indicators
+        indicators (list): List of selected indicators
+        levels (dict): Support/resistance levels
+        strategy_type (str): Strategy type for customization
+        options_data (dict): Options-specific data
+        interval (str): Data interval
+    
+    Returns:
+        plotly.graph_objects.Figure: Enhanced chart
+    """
+    
+    # Convert indicator list to boolean flags for the existing create_chart function
+    show_rsi = any('rsi' in str(ind).lower() for ind in indicators)
+    show_macd = any('macd' in str(ind).lower() for ind in indicators)
+    show_adx = any('adx' in str(ind).lower() for ind in indicators)
+    show_stoch = any('stoch' in str(ind).lower() for ind in indicators)
+    show_obv = any('obv' in str(ind).lower() for ind in indicators)
+    show_atr = any('atr' in str(ind).lower() for ind in indicators)
+    
+    # Filter indicators for overlay indicators (SMA, EMA, etc.)
+    overlay_indicators = []
+    for ind in indicators:
+        ind_str = str(ind).lower()
+        if 'sma' in ind_str:
+            if '20' in ind_str:
+                overlay_indicators.append("20-Day SMA")
+            elif '50' in ind_str:
+                overlay_indicators.append("50-Day SMA")
+        elif 'ema' in ind_str:
+            if '20' in ind_str or '9' in ind_str:
+                overlay_indicators.append("20-Day EMA")
+            elif '50' in ind_str or '21' in ind_str:
+                overlay_indicators.append("50-Day EMA")
+        elif 'vwap' in ind_str:
+            overlay_indicators.append("VWAP")
+        elif 'bollinger' in ind_str or 'bb' in ind_str:
+            overlay_indicators.append("Bollinger Bands")
+        elif 'volatility' in ind_str or 'iv' in ind_str:
+            overlay_indicators.append("Implied Volatility")
+    
+    # Use the existing create_chart function
+    fig = create_chart(
+        data=data,
+        indicators=overlay_indicators,
+        show_rsi=show_rsi,
+        show_macd=show_macd,
+        levels=levels,
+        show_adx=show_adx,
+        show_stoch=show_stoch,
+        show_obv=show_obv,
+        show_atr=show_atr,
+        timeframe=interval
+    )
+    
+    # Add strategy-specific enhancements
+    if strategy_type and "Short-Term" in strategy_type:
+        # Add more aggressive styling for short-term
+        fig.update_layout(
+            title=f"Short-Term Analysis - {interval} Timeframe",
+            title_font_size=16
+        )
+        
+        # Highlight recent price action
+        if len(data) > 20:
+            recent_data = data.tail(20)
+            fig.add_vrect(
+                x0=recent_data.index[0],
+                x1=recent_data.index[-1],
+                fillcolor="yellow",
+                opacity=0.1,
+                layer="below",
+                line_width=0,
+                row=1, col=1
+            )
+    
+    elif strategy_type and "Long-Term" in strategy_type:
+        fig.update_layout(
+            title=f"Long-Term Analysis - {interval} Timeframe",
+            title_font_size=16
+        )
+    
+    # Add options-specific overlays if available
+    if options_data and options_data.get('iv_data'):
+        iv_data = options_data['iv_data']
+        
+        # Add IV rank annotation
+        fig.add_annotation(
+            x=data.index[-1],
+            y=data['Close'].iloc[-1],
+            text=f"IV Rank: {iv_data.get('iv_rank', 0):.1f}%",
+            showarrow=True,
+            arrowhead=2,
+            arrowsize=1,
+            arrowwidth=2,
+            arrowcolor="blue",
+            bgcolor="lightblue",
+            bordercolor="blue",
+            borderwidth=1
+        )
+    
+    # Enhanced layout
+    fig.update_layout(
+        height=800,  # Fixed height as requested
+        showlegend=True,
+        xaxis_rangeslider_visible=False,
+        template="plotly_white",
+        hovermode='x unified'
+    )
+    
+    return fig
