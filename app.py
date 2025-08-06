@@ -12,10 +12,19 @@ st.set_page_config(page_title="AI Technical Analysis", layout="wide")
 st.title("Technical Stock Analysis Dashboard")
 st.sidebar.header("⚙️ Configuration")
 
+
 # --- Modular Sidebar ---
 # Stock ticker, date range, timeframee/interval, analysis type, strategy type, technical indicators
 ticker, fetch_realtime, start_date, end_date, interval, analysis_type, strategy_type, options_strategy = sidebar_config(config)
 active_indicators = sidebar_indicator_selection(strategy_type, interval)
+
+# --- Model Selection Widget ---
+model_type = st.sidebar.selectbox(
+    "Select Model",
+    ["RandomForest", "XGBoost", "LightGBM", "CatBoost"],
+    index=0,
+    help="Choose which machine learning model to use for price prediction."
+)
 
 
 
@@ -182,10 +191,16 @@ if "stock_data" in st.session_state:
             """
 
     # Run AI analysis synchronously (for simplicity)
+
     if run_analysis:
         with st.spinner("AI is analyzing the market..."):
-            # NEW: Get the price prediction
-            predicted_price = predict_next_day_close(data.copy(), fundamentals) # Pass a copy to avoid modifying the original
+            # NEW: Get the price prediction with selected model
+            predicted_price = predict_next_day_close(
+                data.copy(),
+                fundamentals,
+                st.session_state["active_indicators"],
+                model_type=model_type
+            )
             if predicted_price is not None:
                 # NEW: Add predicted price to the data
                 data['Predicted_Close'] = predicted_price
