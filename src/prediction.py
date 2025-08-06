@@ -4,6 +4,7 @@ import yfinance as yf
 from sklearn.ensemble import RandomForestRegressor
 import pandas as pd
 import pandas_ta as ta
+import numpy as np
 from xgboost import XGBRegressor
 from lightgbm import LGBMRegressor
 from catboost import CatBoostRegressor
@@ -27,7 +28,13 @@ def predict_next_day_close(data, fundamentals, selected_indicators, model_type="
     """Predicts the next day's closing price using a RandomForestRegressor."""
     try:
         for key, value in fundamentals.items():
-            data[key] = value
+            # data[key] = value
+            try:
+                data[key] = pd.to_numeric(value, errors='coerce')  # Convert to numeric, coerce errors to NaN
+            except (ValueError, TypeError):
+                st.warning(f"Could not convert {key} to numeric.  Setting to NaN.")
+                data[key] = np.nan # Set to NaN if conversion fails
+
         # Calculate selected indicators
         if "RSI" in selected_indicators:
             data["RSI"] = ta.rsi(data["Close"], length=14)

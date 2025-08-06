@@ -4,6 +4,12 @@ from PIL import Image
 
 # EnhancedPDF class with required methods for app.py
 class EnhancedPDF(FPDF):
+    # def __init__(self, **kwargs):
+    #     super().__init__(**kwargs)
+    #     self.add_font('Arial', '', 'arial.ttf', uni=True)  # Load Arial with unicode support
+    #     self.add_font('Arial', 'B', 'arialbd.ttf', uni=True)  # Load Arial Bold with unicode support
+    #     self.set_font('Arial', '', 12)  # Set default font
+
     def header(self):
         self.set_font("Arial", "B", 18)
         self.cell(0, 10, "AI-Powered Stock Analysis", ln=True, align="C")
