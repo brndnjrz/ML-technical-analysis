@@ -6,7 +6,7 @@ import pandas as pd
 def sidebar_config(config):
     col1, col2 = st.sidebar.columns(2)
     with col1:
-        ticker = st.text_input("Stock Ticker:", config.DEFAULT_TICKER)
+        ticker = st.text_input("Stock Ticker:", config.DEFAULT_TICKER).upper().strip()
     with col2:
         fetch_realtime = st.checkbox("Real-time Data", True)
     start_date = st.sidebar.date_input("Start Date", value=config.DEFAULT_START_DATE)
