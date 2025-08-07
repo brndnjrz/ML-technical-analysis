@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import os
 from src import plotter, ai_analysis, config
 from src.data_pipeline import fetch_and_process_data
 from src.prediction import get_fundamental_metrics, predict_next_day_close
@@ -152,7 +153,51 @@ if "stock_data" in st.session_state:
         """
 
     # Strategy-specific prompts
-    if analysis_type == "Options Trading Strategy":
+    if analysis_type == "Stock Buy/Hold/Sell":
+        if "Short-Term" in strategy_type:
+            prompt = f"""
+            You are an expert short-term stock trader. Analyze this {interval} chart for {ticker}.
+            
+            {market_context}
+            
+            FOCUS ON SHORT-TERM INDICATORS (1-7 days):
+            - RSI signals and momentum
+            - MACD crossovers and trends
+            - Volume patterns and breakouts
+            - Short-term moving averages
+            - Price action and candlestick patterns
+            - Support/resistance levels
+            
+            PROVIDE:
+            1. **RECOMMENDATION**: [BUY/SELL/HOLD]
+            2. **ENTRY POINTS**: Specific price levels
+            3. **STOP LOSS**: Based on support levels and ATR
+            4. **PROFIT TARGETS**: Multiple take-profit levels
+            5. **KEY INDICATORS**: Most relevant signals
+            6. **RISK/REWARD**: Ratio and position sizing
+            """
+        else:  # Long-term
+            prompt = f"""
+            You are an expert long-term stock analyst. Analyze this {interval} chart for {ticker}.
+            
+            {market_context}
+            
+            FOCUS ON LONG-TERM INDICATORS:
+            - Trend strength and direction
+            - Moving average crossovers
+            - Volume trends and accumulation
+            - Long-term support/resistance
+            - Market sentiment indicators
+            
+            PROVIDE:
+            1. **RECOMMENDATION**: [BUY/SELL/HOLD]
+            2. **TIMEFRAME**: Expected holding period
+            3. **ENTRY STRATEGY**: Buy zones and conditions
+            4. **RISK MANAGEMENT**: Stop loss levels
+            5. **TARGET PRICES**: Based on technical levels
+            6. **TREND ANALYSIS**: Primary and secondary trends
+            """
+    elif analysis_type == "Options Trading Strategy":
         if "Short-Term" in strategy_type:
             prompt = f"""
             You are an expert short-term options trader. Analyze this {interval} chart for {ticker}.
@@ -229,7 +274,13 @@ PRICE CHANGE: ${price_change:.2f} ({(price_change/data['Close'].iloc[-1]*100):.1
                     else:
                         prompt = prompt.replace("PROVIDE:", f"{prediction_context}\nCONSIDER HOW THIS PRICE AFFECTS TRENDS AND LONG-TERM STRATEGIES.\n\nPROVIDE:")
 
-            analysis, chart_path = ai_analysis.run_ai_analysis(fig, prompt)
+            # Save the chart to a file in the temp directory
+            
+            chart_path = os.path.join("temp", f"{ticker}_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.png")
+            fig.write_image(chart_path)
+            
+            # Run AI analysis
+            analysis = ai_analysis.run_ai_analysis(fig, prompt)
             st.session_state["ai_analysis_result"] = (analysis, chart_path)
 
     if st.session_state.get("ai_analysis_result") is None and st.session_state.get("ai_analysis_running"):

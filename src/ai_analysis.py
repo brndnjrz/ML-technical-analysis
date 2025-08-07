@@ -1,17 +1,17 @@
 import ollama
 import base64
+import io
 import tempfile
 
 # Integrate AI Analysis 
 def run_ai_analysis(fig, prompt):
-    # Saves the Plotly Chart as a PNG in a temporary file
-    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmpfile:
-        fig.write_image(tmpfile.name)
-        tmpfile_path = tmpfile.name
-
-    # Read image and encode to Base64
-    with open(tmpfile_path, "rb") as image_file:
-        image_data = base64.b64encode(image_file.read()).decode('utf-8')
+    """Run AI analysis on a chart"""
+    # Convert the figure to a base64 string directly
+    
+    buf = io.BytesIO()
+    fig.write_image(buf, format='png')
+    buf.seek(0)
+    image_data = base64.b64encode(buf.read()).decode('utf-8')
 
     # Prepare AI analysis request
     messages = [{
@@ -21,4 +21,4 @@ def run_ai_analysis(fig, prompt):
     }]
     response = ollama.chat(model='llama3.2-vision', messages=messages)
 
-    return response["message"]["content"], tmpfile_path
+    return response["message"]["content"]
