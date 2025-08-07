@@ -6,11 +6,12 @@
 This project provides an **AI-powered technical stock analysis dashboard** built with Streamlit, Plotly, and advanced technical analysis tools. The dashboard features a modern, interactive UI, dynamic strategy and indicator selection, and AI-driven market analysis with PDF reporting.
 
 **Key Features (2025 Update):**
-- Modular codebase: All major logic (data loading, prediction, PDF, UI) is in `src/` modules for maintainability.
-- Combined technical and fundamental metrics for analytics and AI prediction.
-- Price prediction using RandomForestRegressor (scikit-learn) with both technical and fundamental features.
-- Sidebar and dashboard sections are fully modular and reusable.
-- Improved session state management and error handling.
+- Modular codebase with enhanced ML model selection (RandomForest, XGBoost, LightGBM, CatBoost)
+- Real-time data fetching and analysis by default
+- Combined technical and fundamental metrics for analytics and AI prediction
+- Advanced feature engineering for improved prediction accuracy
+- Modular UI components with streamlined configuration
+- Improved error handling and logging system
 
 
 
@@ -22,6 +23,9 @@ This project provides an **AI-powered technical stock analysis dashboard** built
 - `plotly`: For interactive candlestick and technical indicator charts
 - `ollama`: For sending chart images and prompts to an AI model (LLaMA 3.2 Vision)
 - `scikit-learn`: For price prediction using RandomForestRegressor
+- `xgboost`: For XGBoost regression model
+- `lightgbm`: For LightGBM regression model
+- `catboost`: For CatBoost regression model
 - `tempfile`, `base64`, `os`: For temporary file management and PDF/chart handling
 
 
@@ -30,37 +34,38 @@ This project provides an **AI-powered technical stock analysis dashboard** built
 ## **Project Structure**
 
 ```
-├── app.py/                    # Main Streamlit dashboard entry point
+├── app.py                     # Main Streamlit dashboard entry point
 ├── src/
-│   ├── data_loader.py         # Data fetching utilities
-│   ├── indicators.py          # Technical indicator calculations
-│   ├── plotter.py             # Charting utilities
-│   ├── ai_analysis.py         # AI prompt and analysis logic
-│   ├── pdf_generator.py       # PDF report generation
-│   ├── data_pipeline.py       # Modular data fetching/processing pipeline
-│   ├── prediction.py          # Price prediction and fundamental metrics
-│   ├── pdf_utils.py           # PDF display/download helpers
-│   └── ui_components.py       # Sidebar, quick stats, and UI helpers
+│   ├── data_loader.py        # Data fetching utilities
+│   ├── indicators.py         # Technical indicator calculations
+│   ├── plotter.py           # Charting utilities
+│   ├── ai_analysis.py       # AI prompt and analysis logic
+│   ├── pdf_utils.py         # PDF generation and display
+│   ├── data_pipeline.py     # Data processing pipeline
+│   ├── prediction.py        # ML models and feature engineering
+│   ├── ui_components.py     # UI components and layouts
+│   ├── config.py           # Configuration settings
+│   └── trading_strategies.py # Trading strategy definitions
 ```
 
 ## **What the Code Does**
 
 
 ### **1. Streamlit App Setup & UI**
-- The app uses **Streamlit** for a modern, wide-layout dashboard.
-- The sidebar features a two-column layout for ticker and real-time data toggle.
-- Users can select start/end dates, timeframes, and analysis types.
-- Strategy and indicator selection is dynamic and context-aware.
+- Modern, wide-layout dashboard with streamlined controls
+- Sidebar features model selection and strategy configuration
+- Real-time data fetching enabled by default
+- Dynamic indicator selection based on strategy type
 
 
 
 
 ### **2. Inputs for Stock Ticker, Date Range, and Strategy**
-- Enter a stock ticker (e.g., "AAPL") and select real-time data if desired.
-- Choose start and end dates for historical data.
-- Select timeframe (1d, 1h, 30m, 15m, 5m) with recommendations for each.
-- Choose analysis type (Options Trading, Buy/Hold/Sell, Multi-Strategy).
-- For options, select trading timeframe and specific strategy (e.g., Iron Condor, Covered Calls).
+- Enter a stock ticker (e.g., "AAPL")
+- Choose start and end dates for historical data
+- Select ML model type (RandomForest, XGBoost, LightGBM, CatBoost)
+- Select timeframe and analysis type
+- Choose strategy type and specific options strategy if applicable
 
 
 
@@ -84,12 +89,12 @@ This project provides an **AI-powered technical stock analysis dashboard** built
 
 
 
-### **5. AI-Powered Analysis, Price Prediction & PDF Reporting**
-- Uses the `ollama` library (LLaMA 3.2 Vision) for advanced chart and indicator analysis.
-- When users click "Run Analysis 💸":
-  - The chart is saved as an image and sent to the AI model with a detailed, context-aware prompt.
-  - The AI model provides a trade recommendation, strategy, and rationale.
-- **Price prediction**: The dashboard predicts the next day's closing price using a RandomForestRegressor trained on both technical and fundamental features.
+### **5. AI-Powered Analysis & Price Prediction**
+- Advanced feature engineering for ML models
+- Multiple model options with optimized configurations
+- Automatic handling of missing values and data cleaning
+- Real-time prediction confidence scoring
+- Contextual AI analysis based on prediction results
 - Results are displayed in the dashboard.
 - Users can generate a comprehensive PDF report (with chart, analysis, indicators, and risk metrics) for preview and download.
 
@@ -159,7 +164,7 @@ conda deactivate <ENV_NAME>
    - Keep this terminal open while using the dashboard.
 2. In a new terminal, install the required libraries:
    ```bash
-   pip install streamlit plotly ollama pandas yfinance scikit-learn
+   pip install streamlit plotly ollama pandas yfinance scikit-learn xgboost lightgbm catboost
    ```
 3. Run the app:
    ```bash

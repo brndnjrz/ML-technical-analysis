@@ -20,6 +20,56 @@ COLUMN_MAPPING = {
     'Adj Close': 'Adj_Close'  # Handle adjusted close
 }
 
+def get_fundamental_data(ticker):
+    """
+    Fetch fundamental data for a given ticker.
+    
+    Args:
+        ticker (str): Stock ticker symbol
+    
+    Returns:
+        dict: Dictionary containing fundamental metrics
+    """
+    try:
+        stock = yf.Ticker(ticker)
+        info = stock.info
+        
+        # Get earnings data
+        try:
+            earnings = stock.earnings
+            eps_ttm = earnings['EPS'].sum() if not earnings.empty else None
+        except:
+            eps_ttm = None
+        
+        # Calculate metrics
+        fundamentals = {
+            'EPS': info.get('trailingEPS') or eps_ttm,
+            'Revenue Growth': info.get('revenueGrowth', info.get('earningsGrowth')),
+            'Profit Margin': info.get('profitMargins'),
+            'P/E Ratio': info.get('trailingPE'),
+            'Market Cap': info.get('marketCap'),
+            'Volume': info.get('volume'),
+            'Average Volume': info.get('averageVolume'),
+            'Forward P/E': info.get('forwardPE'),
+            'PEG Ratio': info.get('pegRatio'),
+            'Beta': info.get('beta'),
+            'Dividend Yield': info.get('dividendYield', 0)
+        }
+        
+        # Convert ratios to percentages where appropriate
+        if fundamentals['Revenue Growth'] is not None:
+            fundamentals['Revenue Growth'] = fundamentals['Revenue Growth'] * 100
+        if fundamentals['Profit Margin'] is not None:
+            fundamentals['Profit Margin'] = fundamentals['Profit Margin'] * 100
+        if fundamentals['Dividend Yield'] is not None:
+            fundamentals['Dividend Yield'] = fundamentals['Dividend Yield'] * 100
+            
+        return fundamentals
+        
+    except Exception as e:
+        print(f"Error fetching fundamental data: {e}")
+        return {}
+
 # =========================
 # Main Data Fetching Function
 # =========================
@@ -44,6 +94,10 @@ def fetch_stock_data(ticker, start_date=None, end_date=None, interval="1d"):
         if not info or 'symbol' not in info:
             print(f"[Error] Invalid ticker symbol: {ticker}")
             return None
+
+        # Fetch fundamental data
+        fundamentals = get_fundamental_data(ticker)
+        print(f"[Info] Fundamental data: {fundamentals}")
 
         # Fetch data based on interval
         if interval in VALID_INTRADAY_INTERVALS:

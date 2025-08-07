@@ -4,6 +4,10 @@
 # =========================
 import pandas as pd
 import pandas_ta as ta
+import logging
+
+# Set up logging
+logger = logging.getLogger(__name__)
 
 # =========================
 # Indicator Calculation
@@ -37,48 +41,111 @@ def calculate_indicators(data, timeframe="1d", strategy_type=None, selected_indi
     selected_str = str(selected_indicators).lower()
 
     # Implied Volatility (IV)
-    data['returns'] = data['Close'].pct_change()
-    data['volatility'] = data['returns'].rolling(window=21).std() * (252 ** 0.5)
+    data['returns'] = data['Close'].pct_change().fillna(0)
+    data['volatility'] = data['returns'].rolling(window=21).std().fillna(method='ffill').fillna(0) * (252 ** 0.5)
 
     # RSI
     if any(indicator.lower() in selected_str for indicator in ['rsi']):
-        data['RSI'] = ta.rsi(data['Close'], length=14)
-        data[f'RSI_{timeframe}'] = data['RSI']
+        # Calculate both 14 and 21 period RSI
+        data['RSI_14'] = ta.rsi(data['Close'], length=14).fillna(method='ffill').fillna(50)
+        data['RSI_21'] = ta.rsi(data['Close'], length=21).fillna(method='ffill').fillna(50)
+        # Store timeframe specific versions
+        data[f'RSI_{timeframe}'] = data['RSI_14']
+        data['RSI'] = data['RSI_14']  # Default RSI
+        # Forward fill any remaining NaN values
+        for col in ['RSI_14', 'RSI_21', f'RSI_{timeframe}', 'RSI']:
+            data[col] = data[col].fillna(method='ffill').fillna(50)
 
-    # MACD
-    if any(indicator.lower() in selected_str for indicator in ['macd']):
-        macd = ta.macd(data['Close'])
-        data['MACD'] = macd['MACD_12_26_9']
-        data['MACD_Signal'] = macd['MACDs_12_26_9']
-        data[f'MACD_{timeframe}'] = data['MACD']
-        data[f'MACD_Signal_{timeframe}'] = data['MACD_Signal']
+    # MACD (always calculate)
+    macd = ta.macd(data['Close'])
+    # Store MACD values in multiple formats for compatibility
+    data['MACD'] = macd['MACD_12_26_9'].fillna(method='ffill').fillna(0)
+    data['MACD_Signal'] = macd['MACDs_12_26_9'].fillna(method='ffill').fillna(0)
+    data['MACD_Hist'] = macd['MACDh_12_26_9'].fillna(method='ffill').fillna(0)
+    # Store timeframe specific versions
+    data[f'MACD_{timeframe}'] = data['MACD']
+    data[f'MACD_Signal_{timeframe}'] = data['MACD_Signal']
+    data[f'MACD_Hist_{timeframe}'] = data['MACD_Hist']
+    # Store additional formats that might be needed
+    data['MACD_Line'] = data['MACD']
+    data['Signal_Line'] = data['MACD_Signal']
+    data['MACD_Histogram'] = data['MACD_Hist']
+    
+    # Ensure all MACD columns are properly filled
+    macd_cols = ['MACD', 'MACD_Signal', 'MACD_Hist', 
+                 f'MACD_{timeframe}', f'MACD_Signal_{timeframe}', f'MACD_Hist_{timeframe}',
+                 'MACD_Line', 'Signal_Line', 'MACD_Histogram']
+    for col in macd_cols:
+        if col in data.columns:
+            data[col] = data[col].fillna(method='ffill').fillna(0)
 
     # SMA
-    if any(indicator.lower() in selected_str for indicator in ['sma', 'moving']):
-        data[f'SMA_20_{timeframe}'] = data['Close'].rolling(window=20).mean()
-        data[f'SMA_50_{timeframe}'] = data['Close'].rolling(window=50).mean()
+    # Calculate SMAs and handle NaN values (always calculate these basic indicators)
+    data['SMA_20'] = data['Close'].rolling(window=20).mean().fillna(method='ffill')
+    data['SMA_50'] = data['Close'].rolling(window=50).mean().fillna(method='ffill')
+    # Store timeframe specific versions
+    data[f'SMA_20_{timeframe}'] = data['SMA_20']
+    data[f'SMA_50_{timeframe}'] = data['SMA_50']
+    # Add raw SMA columns without timeframe suffix
+    data['SMA20'] = data['SMA_20']
+    data['SMA50'] = data['SMA_50']
+    
+    # Ensure all SMA columns are properly filled
+    sma_cols = ['SMA_20', 'SMA_50', f'SMA_20_{timeframe}', f'SMA_50_{timeframe}', 'SMA20', 'SMA50']
+    for col in sma_cols:
+        data[col] = data[col].fillna(method='ffill').fillna(data['Close'])
 
-    # EMA
-    if any(indicator.lower() in selected_str for indicator in ['ema', 'moving']):
-        data[f'EMA_20_{timeframe}'] = data['Close'].ewm(span=20, adjust=False).mean()
-        data[f'EMA_50_{timeframe}'] = data['Close'].ewm(span=50, adjust=False).mean()
+    # EMA (always calculate these basic indicators)
+    # Calculate EMAs
+    data['EMA_20'] = data['Close'].ewm(span=20, adjust=False).mean().fillna(method='ffill')
+    data['EMA_50'] = data['Close'].ewm(span=50, adjust=False).mean().fillna(method='ffill')
+    # Store timeframe specific versions
+    data[f'EMA_20_{timeframe}'] = data['EMA_20']
+    data[f'EMA_50_{timeframe}'] = data['EMA_50']
+    
+    # Ensure all EMA columns are properly filled
+    ema_cols = ['EMA_20', 'EMA_50', f'EMA_20_{timeframe}', f'EMA_50_{timeframe}']
+    for col in ema_cols:
+        data[col] = data[col].fillna(method='ffill').fillna(data['Close'])
 
-    # VWAP
-    if any(indicator.lower() in selected_str for indicator in ['vwap']):
+    # VWAP (always calculate)
+    try:
         data['VWAP'] = (data['Close'] * data['Volume']).cumsum() / data["Volume"].cumsum()
+        data['VWAP'] = data['VWAP'].fillna(method='ffill').fillna(data['Close'])
+        data[f'VWAP_{timeframe}'] = data['VWAP']
+    except Exception as e:
+        logger.warning(f"Error calculating VWAP: {str(e)}")
+        data['VWAP'] = data['Close']
+        data[f'VWAP_{timeframe}'] = data['Close']
 
-    # Bollinger Bands
-    if any(indicator.lower() in selected_str for indicator in ['bollinger', 'bb']):
-        bb = ta.bbands(data['Close'], length=20, std=2)
-        data[f'BB_upper_{timeframe}'] = bb['BBU_20_2.0']
-        data[f'BB_lower_{timeframe}'] = bb['BBL_20_2.0']
-        data[f'BB_middle_{timeframe}'] = bb['BBM_20_2.0']
+    # Bollinger Bands (always calculate)
+    bb = ta.bbands(data['Close'], length=20, std=2)
+    # Initialize with reasonable values for the first 20 periods
+    data[f'BB_middle_{timeframe}'] = bb['BBM_20_2.0'].fillna(method='ffill').fillna(data['Close'])
+    # Calculate standard deviation for initial upper/lower bands
+    std = data['Close'].rolling(window=20).std().fillna(method='ffill').fillna(data['Close'].std())
+    data[f'BB_upper_{timeframe}'] = bb['BBU_20_2.0'].fillna(data[f'BB_middle_{timeframe}'] + 2 * std)
+    data[f'BB_lower_{timeframe}'] = bb['BBL_20_2.0'].fillna(data[f'BB_middle_{timeframe}'] - 2 * std)
+    
+    # Store standard versions without timeframe
+    data['BB_upper'] = data[f'BB_upper_{timeframe}']
+    data['BB_lower'] = data[f'BB_lower_{timeframe}']
+    data['BB_middle'] = data[f'BB_middle_{timeframe}']
+    
+    # Ensure all BB columns are properly filled
+    bb_cols = ['BB_upper', 'BB_lower', 'BB_middle',
+               f'BB_upper_{timeframe}', f'BB_lower_{timeframe}', f'BB_middle_{timeframe}']
+    for col in bb_cols:
+        data[col] = data[col].fillna(method='ffill')
 
-    # ADX
-    if any(indicator.lower() in selected_str for indicator in ['adx']):
-        adx_result = ta.adx(data['High'], data['Low'], data['Close'])
-        data['ADX'] = adx_result['ADX_14']
-        data[f'ADX_{timeframe}'] = data['ADX']
+    # ADX (always calculate)
+    adx_result = ta.adx(data['High'], data['Low'], data['Close'])
+    data['ADX'] = adx_result['ADX_14'].fillna(method='ffill').fillna(25)  # Fill with neutral value
+    data[f'ADX_{timeframe}'] = data['ADX']
+    
+    # Ensure ADX columns are properly filled
+    for col in ['ADX', f'ADX_{timeframe}']:
+        data[col] = data[col].fillna(method='ffill').fillna(25)
 
     # Stochastic
     if any(indicator.lower() in selected_str for indicator in ['stoch']):
@@ -91,11 +158,59 @@ def calculate_indicators(data, timeframe="1d", strategy_type=None, selected_indi
         data['OBV'] = ta.obv(data['Close'], data['Volume'])
         data[f'OBV_{timeframe}'] = data['OBV']
 
-    # ATR
-    if any(indicator.lower() in selected_str for indicator in ['atr']):
-        data['ATR'] = ta.atr(data['High'], data['Low'], data['Close'])
-        data[f'ATR_{timeframe}'] = data['ATR']
+    # ATR (always calculate)
+    # Calculate ATR and handle initial NaN values
+    atr = ta.atr(data['High'], data['Low'], data['Close'])
+    # Calculate initial ATR value using first available data
+    initial_atr = (data['High'].iloc[0] - data['Low'].iloc[0]) if not atr.empty else 0
+    data['ATR'] = atr.fillna(method='ffill').fillna(initial_atr)
+    data[f'ATR_{timeframe}'] = data['ATR']
+    
+    # Ensure ATR columns are properly filled
+    for col in ['ATR', f'ATR_{timeframe}']:
+        if col in data.columns:
+            data[col] = data[col].fillna(method='ffill').fillna(initial_atr)
 
+    # Verify indicator calculations
+    print("\nIndicator Calculation Summary:")
+    latest_data = data.iloc[-1]
+    
+    # Group indicators for better readability
+    indicator_groups = {
+        'Momentum Indicators': ['RSI_21', 'RSI_14', 'RSI', 'MACD', 'MACD_Signal', 'MACD_Hist'],
+        'Moving Averages': ['SMA_20', 'SMA_50', 'EMA_20', 'EMA_50'],
+        'Trend Indicators': ['ADX', 'VWAP'],
+        'Volatility Indicators': ['ATR', 'BB_upper_' + timeframe, 'BB_lower_' + timeframe]
+    }
+    
+    print("\n=== Technical Indicator Values ===")
+    for group_name, indicators in indicator_groups.items():
+        print(f"\n{group_name}:")
+        for indicator in indicators:
+            if indicator in data.columns:
+                try:
+                    value = latest_data[indicator]
+                    if pd.isna(value):
+                        print(f"  {indicator}: N/A (NaN value)")
+                    else:
+                        print(f"  {indicator}: {value:.4f}")
+                except Exception as e:
+                    print(f"  {indicator}: Error calculating ({str(e)})")
+            else:
+                print(f"  {indicator}: Not calculated")
+    
+    # Verify data quality
+    null_columns = data.columns[data.isnull().any()].tolist()
+    if null_columns:
+        print("\nWarning: Found null values in columns:")
+        for col in null_columns:
+            null_count = data[col].isnull().sum()
+            print(f"  {col}: {null_count} null values")
+    
+    # Print all available columns for debugging
+    print("\nAvailable Columns:")
+    print(", ".join(sorted(data.columns)))
+    
     return data
 
 # =========================
