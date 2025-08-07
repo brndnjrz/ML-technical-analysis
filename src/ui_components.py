@@ -8,9 +8,9 @@ def sidebar_config(config):
     with col1:
         ticker = st.text_input("Stock Ticker:", config.DEFAULT_TICKER).upper().strip()
     with col2:
-        fetch_realtime = st.checkbox("Real-time Data", True)
-    start_date = st.sidebar.date_input("Start Date", value=config.DEFAULT_START_DATE)
-    end_date = st.sidebar.date_input("End Date", value=config.DEFAULT_END_DATE)
+        # fetch_realtime = st.checkbox("Real-time Data", True)
+        start_date = st.sidebar.date_input("Start Date", value=config.DEFAULT_START_DATE)
+        end_date = st.sidebar.date_input("End Date", value=config.DEFAULT_END_DATE)
     interval_options = {
         "1d": "Daily (Long-term)",
         "1h": "Hourly (Short-term)",
@@ -48,7 +48,7 @@ def sidebar_config(config):
                 ["Swing Trading", "Covered Calls", "Protective Puts",
                  "Vertical Spreads", "Calendar Spreads"]
             )
-    return ticker, fetch_realtime, start_date, end_date, interval, analysis_type, strategy_type, options_strategy
+    return ticker, start_date, end_date, interval, analysis_type, strategy_type, options_strategy
 
 def sidebar_indicator_selection(strategy_type, interval):
     st.sidebar.markdown("### 📈 Technical Indicators")

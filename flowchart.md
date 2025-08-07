@@ -11,7 +11,7 @@ flowchart TD
     H --> J[Show stock & options metrics: IV, HV, VIX, EPS, etc.]
     H --> K[Render technical analysis chart with overlays]
     H --> L[AI-Powered Strategy Analysis]
-    L --> M[User sets confidence threshold, clicks 'Run Analysis']
+    L --> M[User clicks 'Run Analysis']
     M --> N[predict_next_day_close: ML model predicts next close]
     N --> O[Update market context & AI prompt]
     O --> P[ai_analysis.run_ai_analysis: Generate strategy recommendation & chart]

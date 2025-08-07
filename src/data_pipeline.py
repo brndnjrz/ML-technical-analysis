@@ -1,4 +1,3 @@
-
 # =========================
 # Imports
 # =========================
@@ -17,7 +16,6 @@ def fetch_and_process_data(
     interval,
     strategy_type,
     analysis_type,
-    fetch_realtime,
     active_indicators
 ):
     """
@@ -56,7 +54,7 @@ def fetch_and_process_data(
         if analysis_type == "Options Trading Strategy":
             try:
                 iv_data = indicators.calculate_iv_metrics(ticker, data_with_indicators)
-                options_flow = indicators.get_options_flow(ticker) if fetch_realtime else None
+                options_flow = indicators.get_options_flow(ticker)  # Always fetch real-time options flow
                 options_data = {"iv_data": iv_data, "options_flow": options_flow}
             except Exception as options_error:
                 st.warning(f"⚠️ Options data unavailable: {str(options_error)}")
@@ -66,5 +64,7 @@ def fetch_and_process_data(
 
     except Exception as e:
         st.error(f"❌ Error in fetch_and_process_data: {str(e)}")
+        st.code(traceback.format_exc())
+        return None, None, None
         st.code(traceback.format_exc())
         return None, None, None
