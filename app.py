@@ -17,7 +17,7 @@ st.sidebar.header("⚙️ Configuration")
 # --- Model Selection Widget ---
 model_type = st.sidebar.selectbox(
     "Select Model",
-    ["RandomForest", "XGBoost", "LightGBM", "CatBoost"],
+    ["RandomForest", "XGBoost", "CatBoost"],
     index=0,
     help="Choose which machine learning model to use for price prediction."
 )

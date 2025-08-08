@@ -89,13 +89,13 @@ def sidebar_indicator_selection(strategy_type, interval, data=None):
             # Helper function to get appropriate indicators based on timeframe
             if is_short_term:
                 return {
-                    # Short-term indicators (5m timeframe focused)
-                    "rsi": ["RSI (5min)", "RSI (14)"],
-                    "ma": ["EMA (20) 5min", "EMA (50) 5min", "SMA (20) 5min"],
-                    "volatility": ["ATR 5min", "Bollinger Bands 5min"],
-                    "momentum": ["MACD 5min", "Stochastic Fast 5min"],
-                    "volume": ["OBV 5min", "VWAP 5min"],
-                    "trend": ["ADX 5min"]
+                    # Short-term indicators (15m timeframe focused)
+                    "rsi": ["RSI (15min)", "RSI (14)"],
+                    "ma": ["EMA (20) 15m", "EMA (50) 15m", "SMA (20) 15m"],
+                    "volatility": ["ATR 15m", "Bollinger Bands 15m"],
+                    "momentum": ["MACD 15m", "Stochastic Fast 15m"],
+                    "volume": ["OBV 15m", "VWAP 15m"],
+                    "trend": ["ADX 15m"]
                 }
             else:
                 return {
@@ -126,9 +126,9 @@ def sidebar_indicator_selection(strategy_type, interval, data=None):
         if market_condition == "high_volatility":
             # High volatility - focus on momentum and quick moves
             if is_short_term:
-                base_indicators["momentum"].extend(["RSI (5min)", "Stochastic Fast 5min"])
-                base_indicators["volatility"].extend(["ATR 5min"])
-                base_indicators["volume"].extend(["VWAP 5min"])
+                base_indicators["momentum"].extend(["RSI (15min)", "Stochastic Fast 15m"])
+                base_indicators["volatility"].extend(["ATR 15m"])
+                base_indicators["volume"].extend(["VWAP 15m"])
             else:
                 base_indicators["momentum"].extend(["RSI (14)", "MACD"])
                 base_indicators["volatility"].extend(["ATR"])
@@ -137,8 +137,8 @@ def sidebar_indicator_selection(strategy_type, interval, data=None):
         elif market_condition == "low_volatility":
             # Low volatility - focus on trend following
             if is_short_term:
-                base_indicators["trend"].extend(["EMA (20) 5min", "ADX 5min"])
-                base_indicators["volume"].extend(["OBV 5min"])
+                base_indicators["trend"].extend(["EMA (20) 15m", "ADX 15m"])
+                base_indicators["volume"].extend(["OBV 15m"])
             else:
                 base_indicators["trend"].extend(["SMA (50)", "EMA (50)"])
                 base_indicators["volume"].extend(["OBV", "Volume"])
@@ -170,7 +170,7 @@ def sidebar_indicator_selection(strategy_type, interval, data=None):
             st.markdown("""
             **Short-Term Trading Indicators:**
             
-            🔄 **5-Minute Timeframe Focus**
+            🔄 **15-Minute Timeframe Focus**
             - RSI and Stochastic for quick momentum shifts
             - Short-term EMAs for immediate trend
             - VWAP for intraday price levels

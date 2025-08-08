@@ -5,7 +5,6 @@ import pandas as pd
 import pandas_ta as ta
 import numpy as np
 from xgboost import XGBRegressor
-from lightgbm import LGBMRegressor
 from catboost import CatBoostRegressor
 from dataclasses import dataclass
 from typing import Dict, Any, Tuple, Optional
@@ -42,24 +41,24 @@ def engineer_features(data: pd.DataFrame) -> pd.DataFrame:
         
         # Volume analysis
         df['Volume_MA'] = ta.sma(df['Volume'], length=20)
-        df['Volume_MA'] = df['Volume_MA'].fillna(method='ffill')
+        df['Volume_MA'] = df['Volume_MA'].ffill()  # Updated
         df['Volume_Trend'] = (df['Volume']/df['Volume_MA']).fillna(1.0)  # Default to neutral
         df['OBV'] = ta.obv(df['Close'], df['Volume'])
-        df['OBV'] = df['OBV'].fillna(method='ffill')
+        df['OBV'] = df['OBV'].ffill()  # Updated
         
         # Volatility indicators
         df['ATR'] = ta.atr(df['High'], df['Low'], df['Close'], length=14)
         bb = ta.bbands(df['Close'])
         # Handle potential NaN values in Bollinger Bands
-        bb_upper = bb['BBU_5_2.0'].fillna(method='ffill')
-        bb_lower = bb['BBL_5_2.0'].fillna(method='ffill')
-        bb_middle = bb['BBM_5_2.0'].fillna(method='ffill')
+        bb_upper = bb['BBU_5_2.0'].ffill()  # Updated
+        bb_lower = bb['BBL_5_2.0'].ffill()  # Updated
+        bb_middle = bb['BBM_5_2.0'].ffill()  # Updated
         df['BB_Width'] = ((bb_upper - bb_lower) / bb_middle).fillna(0)
         
         # Fill NaN values with appropriate methods
         # For trend indicators, forward fill is appropriate
         trend_cols = ['SMA_20', 'EMA_20', 'Trend_Strength', 'Volume_MA', 'BB_Width']
-        df[trend_cols] = df[trend_cols].fillna(method='ffill')
+        df[trend_cols] = df[trend_cols].ffill()  # Updated
         
         # For momentum indicators, use median
         momentum_cols = ['RSI', 'RSI_MA', 'RSI_Trend', 'ATR']
@@ -183,9 +182,9 @@ def predict_next_day_close(data: pd.DataFrame, fundamentals: dict, selected_indi
         if "MACD" in selected_indicators:
             macd = ta.macd(df["Close"])
             df = df.assign(
-                MACD=macd["MACD_12_26_9"].fillna(method='ffill'),
-                MACDh=macd["MACDh_12_26_9"].fillna(method='ffill'),
-                MACDs=macd["MACDs_12_26_9"].fillna(method='ffill')
+                MACD=macd["MACD_12_26_9"].ffill(),  # Updated
+                MACDh=macd["MACDh_12_26_9"].ffill(),  # Updated
+                MACDs=macd["MACDs_12_26_9"].ffill()  # Updated
             )
         
         # Handle missing values with detailed logging
@@ -197,7 +196,7 @@ def predict_next_day_close(data: pd.DataFrame, fundamentals: dict, selected_indi
                 
                 if col in fundamental_cols:
                     # For fundamental metrics, forward fill and then backfill
-                    df[col] = df[col].fillna(method='ffill').fillna(method='bfill').fillna(0)
+                    df[col] = df[col].ffill().bfill().fillna(0)  # Updated
                     logger.info(f"Filled fundamental metric {col} using forward/backward fill")
                 elif col in ['Returns', 'Log_Returns', 'Volatility']:
                     df[col] = df[col].fillna(0)
@@ -206,7 +205,7 @@ def predict_next_day_close(data: pd.DataFrame, fundamentals: dict, selected_indi
                     median_val = df[col].median()
                     df[col] = df[col].fillna(median_val)
                     logger.info(f"Filled NaN values in {col} with median value: {median_val}")
-        
+                    
         # Double-check for any remaining NaN values
         remaining_nans = df.isna().sum()
         if remaining_nans.any():

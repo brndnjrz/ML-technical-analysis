@@ -6,7 +6,7 @@
 This project provides an **AI-powered technical stock analysis dashboard** built with Streamlit, Plotly, and advanced technical analysis tools. The dashboard features a modern, interactive UI, dynamic strategy and indicator selection, and AI-driven market analysis with PDF reporting.
 
 **Key Features (2025 Update):**
-- Modular codebase with enhanced ML model selection (RandomForest, XGBoost, LightGBM, CatBoost)
+- Modular codebase with enhanced ML model selection (RandomForest, XGBoost, CatBoost)
 - Real-time data fetching and analysis by default
 - Combined technical and fundamental metrics for analytics and AI prediction
 - Advanced feature engineering for improved prediction accuracy
@@ -24,7 +24,6 @@ This project provides an **AI-powered technical stock analysis dashboard** built
 - `ollama`: For sending chart images and prompts to an AI model (LLaMA 3.2 Vision)
 - `scikit-learn`: For price prediction using RandomForestRegressor
 - `xgboost`: For XGBoost regression model
-- `lightgbm`: For LightGBM regression model
 - `catboost`: For CatBoost regression model
 - `tempfile`, `base64`, `os`: For temporary file management and PDF/chart handling
 
@@ -63,7 +62,7 @@ This project provides an **AI-powered technical stock analysis dashboard** built
 ### **2. Inputs for Stock Ticker, Date Range, and Strategy**
 - Enter a stock ticker (e.g., "AAPL")
 - Choose start and end dates for historical data
-- Select ML model type (RandomForest, XGBoost, LightGBM, CatBoost)
+- Select ML model type (RandomForest, XGBoost, CatBoost)
 - Select timeframe and analysis type
 - Choose strategy type and specific options strategy if applicable
 
@@ -164,7 +163,7 @@ conda deactivate <ENV_NAME>
    - Keep this terminal open while using the dashboard.
 2. In a new terminal, install the required libraries:
    ```bash
-   pip install streamlit plotly ollama pandas yfinance scikit-learn xgboost lightgbm catboost
+   pip install streamlit plotly ollama pandas yfinance scikit-learn xgboost catboost
    ```
 3. Run the app:
    ```bash
