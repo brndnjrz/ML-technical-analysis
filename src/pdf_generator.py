@@ -6,11 +6,10 @@ import os
 
 # EnhancedPDF class with required methods for app.py
 class EnhancedPDF(FPDF):
-    # def __init__(self, **kwargs):
-    #     super().__init__(**kwargs)
-    #     self.add_font('Arial', '', 'arial.ttf', uni=True)  # Load Arial with unicode support
-    #     self.add_font('Arial', 'B', 'arialbd.ttf', uni=True)  # Load Arial Bold with unicode support
-    #     self.set_font('Arial', '', 12)  # Set default font
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # Use built-in fonts instead of trying to load external font files
+        self.set_font('Arial', '', 12)  # Set default font
 
     def header(self):
         self.set_font("Arial", "B", 18)
@@ -184,5 +183,126 @@ class EnhancedPDF(FPDF):
             self.cell(0, 8, f"VIX Level: {iv.get('vix', 'N/A')}", ln=True)
         self.ln(2)
 
+    def add_indicators(self, data, active_indicators):
+        """Add technical indicators section to the PDF."""
+        if not active_indicators:
+            return
+
+        # Define indicator mappings
+        indicator_mappings = {
+            "RSI (14)": "RSI_14",
+            "RSI (21)": "RSI_21",
+            "SMA (20)": "SMA_20",
+            "SMA (50)": "SMA_50",
+            "EMA (20)": "EMA_20",
+            "EMA (50)": "EMA_50",
+            "ADX": "ADX",
+            "ATR": "ATR",
+            "Bollinger Bands Upper": "BB_upper",
+            "Bollinger Bands Middle": "BB_middle",
+            "Bollinger Bands Lower": "BB_lower",
+            "OBV": "OBV",
+            "VWAP": "VWAP",
+            "Volume": "Volume",
+            "MACD": "MACD",
+            "MACD Line": "MACD_Line",
+            "Signal Line": "MACD_Signal",
+            "MACD Histogram": "MACD_Histogram",
+            "Predicted Close": "predicted_close",
+            "Predicted Price Change": "price_change"
+        }
+
+        # First check which indicators are active and in our data
+        available_indicators = [name for name, col in indicator_mappings.items() 
+                              if col in data.columns]
+        
+        # Debug print
+        print("Available columns in DataFrame:", sorted(data.columns.tolist()))
+        print("Mapped indicators found:", sorted(available_indicators))
+
+        for display_name in available_indicators:
+            try:
+                column_name = indicator_mappings[display_name]
+                val = data[column_name].iloc[-1]  # Get the most recent value
+                
+                if pd.notna(val):  # Check if the value is not NaN
+                    # Format the value based on indicator type
+                    if isinstance(val, (int, float)):
+                        if "RSI" in column_name or "ADX" in column_name:
+                            val_str = f"{val:.2f}"  # Regular format for RSI/ADX
+                        elif "MACD" in column_name:
+                            val_str = f"{val:.4f}"  # More precision for MACD
+                        elif "MA" in column_name or "EMA" in column_name or "SMA" in column_name or "BB" in column_name:
+                            val_str = f"${val:.2f}"  # Price format for moving averages and Bollinger Bands
+                        elif column_name == "Volume":
+                            val_str = f"{int(val):,}"  # Integer format for volume
+                        elif "predicted" in column_name.lower():
+                            val_str = f"${val:.2f}"  # Price format for predictions
+                        elif "price_change" in column_name.lower():
+                            val_str = f"${val:.2f}"  # Price format for changes
+                        elif "%" in column_name or "Percent" in column_name:
+                            val_str = f"{val:.2%}"  # Percentage format
+                        else:
+                            val_str = f"{val:.4f}"  # Default format
+                    else:
+                        val_str = str(val)
+                else:
+                    val_str = "N/A"
+                
+                self.cell(0, 8, f"{display_name}: {val_str}", ln=True)
+            except Exception as e:
+                print(f"Error processing indicator {display_name}: {str(e)}")
+                self.cell(0, 8, f"{display_name}: Error", ln=True)
+        
+        self.ln(2)
+
 # For backward compatibility if needed
 PDF = EnhancedPDF
+
+def generate_pdf(ticker, strategy_type, options_strategy, data, analysis, chart_path, levels, options_data, active_indicators, output_path):
+    """Generate a PDF report with the analysis results."""
+    pdf = EnhancedPDF()
+    pdf.add_page()
+    
+    # Add header information
+    pdf.add_header(ticker, strategy_type, options_strategy)
+    
+    # Add chart if available
+    if chart_path:
+        pdf.add_chart(chart_path)
+    
+    # Add analysis section
+    pdf.set_font("Arial", "B", 13)
+    pdf.cell(0, 10, "AI Analysis", ln=True)
+    pdf.set_font("Arial", "", 11)
+    
+    # Handle different analysis formats
+    if isinstance(analysis, dict):
+        for key, value in analysis.items():
+            if isinstance(value, list):
+                pdf.cell(0, 8, f"{key}:", ln=True)
+                for item in value:
+                    pdf.cell(10)  # indent
+                    pdf.cell(0, 8, f"• {item}", ln=True)
+            else:
+                pdf.cell(0, 8, f"{key}: {value}", ln=True)
+    elif isinstance(analysis, str):
+        pdf.multi_cell(0, 8, analysis)
+    
+    # Add technical indicators
+    if active_indicators:
+        pdf.set_font("Arial", "B", 13)
+        pdf.cell(0, 10, "Technical Indicators", ln=True)
+        pdf.set_font("Arial", "", 11)
+        pdf.add_indicators(data, active_indicators)
+    
+    # Add risk analysis
+    pdf.add_risk_analysis(data, levels, options_data)
+    
+    # Save the PDF
+    try:
+        pdf.output(output_path)
+        return True
+    except Exception as e:
+        print(f"Error generating PDF: {str(e)}")
+        return False
