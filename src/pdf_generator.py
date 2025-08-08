@@ -70,102 +70,51 @@ class EnhancedPDF(FPDF):
         # Map indicator names to their corresponding DataFrame column names
         indicator_mapping = {
             # Regular Timeframe Indicators
-            ## RSI Variations
             "RSI (14)": "RSI_14",
             "RSI (21)": "RSI_21",
             "RSI (Standard)": "RSI",
+            "RSI (15min)": "RSI_5m",  # Updated to match data
             
-            ## Moving Averages
+            # Moving Averages
             "SMA (20)": "SMA_20",
             "SMA (50)": "SMA_50",
             "EMA (20)": "EMA_20",
             "EMA (50)": "EMA_50",
+            "EMA (20) 15m": "EMA_20_5m",  # Updated to match data
+            "EMA (50) 15m": "EMA_50_5m",  # Updated to match data
+            "SMA (20) 15m": "SMA_20_5m",  # Updated to match data
+            "SMA (50) 15m": "SMA_50_5m",  # Updated to match data
             
-            ## Volatility
+            # Volatility
             "ATR": "ATR",
+            "ATR 15m": "ATR_5m",  # Updated to match data
             "Bollinger Bands": ["BB_upper", "BB_middle", "BB_lower"],
+            "Bollinger Bands 15m": ["BB_upper_5m", "BB_middle_5m", "BB_lower_5m"],  # Updated to match data
             
-            ## Momentum
+            # Momentum
             "MACD": ["MACD", "MACD_Signal", "MACD_Hist"],
+            "MACD 15m": ["MACD_5m", "MACD_Signal_5m", "MACD_Hist_5m"],  # Updated to match data
             "MACD Line": "MACD_Line",
             "Signal Line": "Signal_Line",
             "MACD Histogram": "MACD_Histogram",
+            "Stochastic Fast 15m": ["STOCH_%K_5m", "STOCH_%D_5m"],  # Updated to match data
             
-            ## Volume
+            # Volume
             "OBV": "OBV",
+            "OBV 15m": "OBV_5m",  # Updated to match data
             "Volume": "Volume",
             "VWAP": "VWAP",
+            "VWAP 15m": "VWAP_5m",  # Updated to match data
             
-            ## Trend
+            # Trend
             "ADX": "ADX",
-
-            # 5-Minute Timeframe Indicators
-            ## RSI
-            "RSI (5min)": "RSI_5m",
-            
-            ## Moving Averages
-            "SMA (20) 5min": "SMA_20_5m",
-            "SMA (50) 5min": "SMA_50_5m",
-            "EMA (20) 5min": "EMA_20_5m",
-            "EMA (50) 5min": "EMA_50_5m",
-            
-            ## Volatility
-            "ATR 5min": "ATR_5m",
-            "Bollinger Bands 5min": ["BB_upper_5m", "BB_middle_5m", "BB_lower_5m"],
-            
-            ## Momentum
-            "MACD 5min": ["MACD_5m", "MACD_Signal_5m", "MACD_Hist_5m"],
-            "Stochastic Fast 5min": ["STOCH_%K_5m", "STOCH_%D_5m"],
-            
-            ## Volume
-            "OBV 5min": "OBV_5m",
-            "VWAP 5min": "VWAP_5m",
-            
-            ## Trend
-            "ADX 5min": "ADX_5m",
+            "ADX 15m": "ADX_5m",  # Updated to match data
             
             # Predictions and Analysis
             "Predicted Close": "Predicted_Close",
             "Predicted Price Change": "Predicted_Price_Change",
             "Volatility": "volatility",
-            "Returns": "returns",
-            
-            # 5-Minute Timeframe Indicators
-            ## RSI
-            "RSI (5min)": "RSI_5m",
-            
-            ## Moving Averages
-            "SMA (20) 5min": "SMA_20_5m",
-            "SMA (50) 5min": "SMA_50_5m",
-            "EMA (20) 5min": "EMA_20_5m",
-            "EMA (50) 5min": "EMA_50_5m",
-            
-            ## Volatility
-            "ATR 5min": "ATR_5m",
-            "Bollinger Bands 5min": ["BB_upper_5m", "BB_middle_5m", "BB_lower_5m"],
-            
-            ## Momentum
-            "MACD 5min": ["MACD_5m", "MACD_Signal_5m", "MACD_Hist_5m"],
-            "Stochastic Fast 5min": ["STOCH_%K_5m", "STOCH_%D_5m"],
-            
-            ## Volume
-            "OBV 5min": "OBV_5m",
-            "VWAP 5min": "VWAP_5m",
-            
-            ## Trend
-            "ADX 5min": "ADX_5m",
-            
-            # Price Prediction
-            "Predicted Close": "Predicted_Close",
-            "Predicted Price Change": "Predicted_Price_Change",
-            
-            # Additional Metrics
-            "Volatility": "volatility",
-            "Returns": "returns",
-            
-            # Trend Indicators
-            "ADX": "ADX",
-            "VWAP": "VWAP"
+            "Returns": "returns"
         }
 
         # Print available columns for debugging
