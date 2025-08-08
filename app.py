@@ -274,28 +274,64 @@ PRICE CHANGE: ${price_change:.2f} ({(price_change/data['Close'].iloc[-1]*100):.1
                     else:
                         prompt = prompt.replace("PROVIDE:", f"{prediction_context}\nCONSIDER HOW THIS PRICE AFFECTS TRENDS AND LONG-TERM STRATEGIES.\n\nPROVIDE:")
 
-            # Save the chart to a file in the temp directory
+            # Create and save the chart to a file in the temp directory
+            temp_dir = os.path.join(os.path.dirname(__file__), "temp")
+            os.makedirs(temp_dir, exist_ok=True)
             
-            chart_path = os.path.join("temp", f"{ticker}_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.png")
+            chart_path = os.path.join(temp_dir, f"{ticker}_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.png")
             fig.write_image(chart_path)
             
             # Run AI analysis
-            analysis = ai_analysis.run_ai_analysis(fig, prompt)
-            st.session_state["ai_analysis_result"] = (analysis, chart_path)
+            analysis, recommendation = ai_analysis.run_ai_analysis(
+                fig=fig,
+                data=data,
+                ticker=ticker,
+                prompt=prompt
+            )
+            st.session_state["ai_analysis_result"] = (analysis, chart_path, recommendation)
 
     if st.session_state.get("ai_analysis_result") is None and st.session_state.get("ai_analysis_running"):
         st.info("AI analysis started... Please wait.")
         st.spinner("AI is analyzing the market...")
 
     if st.session_state.get("ai_analysis_result"):
-        analysis, chart_path = st.session_state["ai_analysis_result"]
-        st.markdown("### 📋 Analysis Results")
-        if "YES" in analysis.upper():
-            st.success("🟢 **TRADE SIGNAL DETECTED**")
-        elif "NO" in analysis.upper():
-            st.warning("🔴 **NO TRADE RECOMMENDED**")
-        else:
-            st.info("🔵 **NEUTRAL SIGNAL**")
+        analysis, chart_path, recommendation = st.session_state["ai_analysis_result"]
+        
+        # Display Analysis Results
+        st.markdown("### 📋 AI Trading Analysis")
+        
+        # Strategy Overview
+        if recommendation and 'strategy' in recommendation:
+            strategy = recommendation['strategy']
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Strategy", strategy.get('name', 'N/A'))
+            with col2:
+                st.metric("Confidence", f"{strategy.get('confidence', 0) * 100:.0f}%")
+            with col3:
+                st.metric("Risk Level", strategy.get('risk_level', 'N/A').upper())
+        
+        # Market Analysis Metrics
+        if recommendation and 'market_analysis' in recommendation:
+            market = recommendation['market_analysis']
+            st.markdown("#### 📊 Market Conditions")
+            metrics_col1, metrics_col2, metrics_col3, metrics_col4 = st.columns(4)
+            with metrics_col1:
+                st.metric("RSI", f"{market.get('RSI', 0):.2f}")
+            with metrics_col2:
+                st.metric("MACD Signal", market.get('MACD_Signal', 'N/A'))
+            with metrics_col3:
+                st.metric("Volume", market.get('volume_signal', 'N/A'))
+            with metrics_col4:
+                st.metric("Trend Strength", f"{market.get('trend_strength', 0):.2f}")
+        
+        # Trade Parameters
+        if recommendation and 'parameters' in recommendation and recommendation['parameters']:
+            st.markdown("#### 📈 Trade Parameters")
+            st.json(recommendation['parameters'])
+        
+        # Full Analysis
+        st.markdown("#### � Detailed Analysis")
         st.markdown(analysis)
         # Enhanced PDF Generation
         if st.button("📄 Generate Detailed Report"):
