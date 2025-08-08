@@ -267,3 +267,61 @@ def predict_next_day_close(data: pd.DataFrame, fundamentals: dict, selected_indi
     except Exception as e:
         logger.error(f"Error in predict_next_day_close: {str(e)}\nShape of data: {data.shape}")
         return None, None
+
+def create_strategy_features(data: pd.DataFrame, strategy_type: str) -> pd.DataFrame:
+    """Create features based on specific trading strategies."""
+    
+    df = data.copy()
+    
+    # Strategy-specific feature combinations
+    strategy_features = {
+        "Day Trading Calls/Puts": {
+            'momentum': (df['RSI_14'] > 50) & (df['MACD'] > df['MACD_Signal']),
+            'volume_confirm': df['Volume'] > df['Volume'].rolling(20).mean(),
+            'trend_align': df['Close'] > df['EMA_20']
+        },
+        
+        "Swing Trading": {
+            'trend_strength': df['ADX'] > 25,
+            'ma_alignment': (df['EMA_20'] > df['EMA_50']) & (df['Close'] > df['EMA_20']),
+            'momentum_confirm': (df['RSI_14'] > 40) & (df['RSI_14'] < 70)
+        },
+        
+        "Iron Condor": {
+            'volatility_high': df['ATR'] > df['ATR'].rolling(20).mean(),
+            'range_bound': (df['Close'] > df['BB_lower']) & (df['Close'] < df['BB_upper']),
+            'trend_weak': df['ADX'] < 25
+        }
+    }
+    
+    # Add strategy-specific features
+    if strategy_type in strategy_features:
+        for name, condition in strategy_features[strategy_type].items():
+            df[f'strategy_{name}'] = condition.astype(int)
+    
+    return df
+
+def train_strategy_model(data: pd.DataFrame, strategy_type: str) -> Any:
+    """Train model with strategy-specific features."""
+    
+    # Add strategy features
+    df = create_strategy_features(data, strategy_type)
+    
+    # Select features based on strategy
+    if "Day Trading" in strategy_type:
+        lookback = 5  # Shorter lookback for day trading
+        features = ['RSI_14', 'MACD', 'Volume', 'ATR', 'strategy_momentum', 
+                   'strategy_volume_confirm', 'strategy_trend_align']
+    else:
+        lookback = 20  # Longer lookback for swing trading
+        features = ['RSI_14', 'ADX', 'ATR', 'BB_upper', 'BB_lower', 
+                   'strategy_trend_strength', 'strategy_ma_alignment']
+    
+    # Create model with optimized parameters
+    model = create_model("RandomForest", {
+        'n_estimators': 200,
+        'max_depth': 12,
+        'min_samples_split': 5
+    })
+    
+    return model, features
