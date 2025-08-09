@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import os
+import logging 
 from src import plotter, ai_analysis, config
 from src.data_pipeline import fetch_and_process_data
 from src.prediction import get_fundamental_metrics, predict_next_day_close
@@ -8,6 +9,10 @@ from src.pdf_utils import generate_and_display_pdf
 from src.ui_components import render_sidebar_quick_stats, sidebar_config, sidebar_indicator_selection
 from src.trading_strategies import strategies_data  # Add this import at the top
 
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+    )
 
 # Set Up Streamlit App UI 
 st.set_page_config(page_title="AI Technical Analysis", layout="wide")
@@ -107,6 +112,12 @@ if "stock_data" in st.session_state:
         options_data=options_data,
         interval=interval
     )
+
+    # Print available columns to the console for debugging
+    # print("Available columns:", list(data.columns))
+    # ...existing code...
+    logging.info("Available columns: %s", list(data.columns))
+
 
     st.plotly_chart(fig, use_container_width=True, height=800)
     
@@ -282,13 +293,18 @@ PRICE CHANGE: ${price_change:.2f} ({(price_change/data['Close'].iloc[-1]*100):.1
             fig.write_image(chart_path)
             
             # Run AI analysis
-            analysis, recommendation = ai_analysis.run_ai_analysis(
-                fig=fig,
-                data=data,
-                ticker=ticker,
-                prompt=prompt
-            )
-            st.session_state["ai_analysis_result"] = (analysis, chart_path, recommendation)
+            try:
+                analysis, recommendation = ai_analysis.run_ai_analysis(
+                    fig=fig,
+                    data=data,
+                    ticker=ticker,
+                    prompt=prompt
+                )
+                st.session_state["ai_analysis_result"] = (analysis, chart_path, recommendation)
+            except Exception as e:
+                st.error(f"AI analysis failed: {e}")
+                import traceback
+                traceback.print_exc()
 
     if st.session_state.get("ai_analysis_result") is None and st.session_state.get("ai_analysis_running"):
         st.info("AI analysis started... Please wait.")
@@ -309,7 +325,9 @@ PRICE CHANGE: ${price_change:.2f} ({(price_change/data['Close'].iloc[-1]*100):.1
             with col2:
                 st.metric("Confidence", f"{strategy.get('confidence', 0) * 100:.0f}%")
             with col3:
-                st.metric("Risk Level", strategy.get('risk_level', 'N/A').upper())
+                # Fix: get risk_level from risk_assessment, not strategy
+                risk_level = recommendation.get('risk_assessment', {}).get('risk_level', 'N/A')
+                st.metric("Risk Level", str(risk_level).upper())
         
         # Market Analysis Metrics
         if recommendation and 'market_analysis' in recommendation:

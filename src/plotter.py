@@ -1,4 +1,3 @@
-
 # =========================
 # Imports
 # =========================
@@ -18,7 +17,9 @@ def create_chart(
     show_stoch=False,
     show_obv=False,
     show_atr=False,
-    timeframe="1d"
+    timeframe="1d",
+    yaxis_range=None,
+    xaxis_range=None
 ):
     """
     Generate a multi-row technical analysis chart with overlays and indicators.
@@ -64,59 +65,99 @@ def create_chart(
             ), row=i, col=1)
             # Overlays
             for indicator in indicators:
-                if indicator == "20-Day SMA" and "SMA_20" in data.columns:
-                    fig.add_trace(go.Scatter(x=data.index, y=data['SMA_20'], name="SMA 20"), row=i, col=1)
-                elif indicator == "50-Day SMA" and "SMA_50" in data.columns:
-                    fig.add_trace(go.Scatter(x=data.index, y=data['SMA_50'], name="SMA 50"), row=i, col=1)
-                elif indicator == "20-Day EMA" and "EMA_20" in data.columns:
-                    fig.add_trace(go.Scatter(x=data.index, y=data['EMA_20'], name="EMA 20"), row=i, col=1)
-                elif indicator == "50-Day EMA" and "EMA_50" in data.columns:
-                    fig.add_trace(go.Scatter(x=data.index, y=data['EMA_50'], name="EMA 50"), row=i, col=1)
-                elif indicator == "VWAP" and "VWAP" in data.columns:
-                    fig.add_trace(go.Scatter(x=data.index, y=data['VWAP'], name="VWAP"), row=i, col=1)
+                if indicator == "20-Day SMA":
+                    col = f"SMA_20_{timeframe}" if f"SMA_20_{timeframe}" in data.columns else "SMA_20"
+                    if col in data.columns:
+                        fig.add_trace(go.Scatter(x=data.index, y=data[col], name="SMA 20"), row=i, col=1)
+                elif indicator == "50-Day SMA":
+                    col = f"SMA_50_{timeframe}" if f"SMA_50_{timeframe}" in data.columns else "SMA_50"
+                    if col in data.columns:
+                        fig.add_trace(go.Scatter(x=data.index, y=data[col], name="SMA 50"), row=i, col=1)
+                elif indicator == "20-Day EMA":
+                    col = f"EMA_20_{timeframe}" if f"EMA_20_{timeframe}" in data.columns else "EMA_20"
+                    if col in data.columns:
+                        fig.add_trace(go.Scatter(x=data.index, y=data[col], name="EMA 20"), row=i, col=1)
+                elif indicator == "50-Day EMA":
+                    col = f"EMA_50_{timeframe}" if f"EMA_50_{timeframe}" in data.columns else "EMA_50"
+                    if col in data.columns:
+                        fig.add_trace(go.Scatter(x=data.index, y=data[col], name="EMA 50"), row=i, col=1)
+                elif indicator == "VWAP":
+                    col = f"VWAP_{timeframe}" if f"VWAP_{timeframe}" in data.columns else "VWAP"
+                    if col in data.columns:
+                        fig.add_trace(go.Scatter(x=data.index, y=data[col], name="VWAP"), row=i, col=1)
                 elif indicator == "Implied Volatility" and "volatility" in data.columns:
                     fig.add_trace(go.Scatter(x=data.index, y=data['volatility'], name="Implied Volatility"), row=i, col=1)
                 elif indicator == "Bollinger Bands":
-                    if "BB_upper" in data.columns:
-                        fig.add_trace(go.Scatter(x=data.index, y=data['BB_upper'], name="BB Upper"), row=i, col=1)
-                    if "BB_middle" in data.columns:
-                        fig.add_trace(go.Scatter(x=data.index, y=data['BB_middle'], name="BB Middle"), row=i, col=1)
-                    if "BB_lower" in data.columns:
-                        fig.add_trace(go.Scatter(x=data.index, y=data['BB_lower'], name="BB Lower"), row=i, col=1)
+                    upper = f"BB_upper_{timeframe}" if f"BB_upper_{timeframe}" in data.columns else "BB_upper"
+                    middle = f"BB_middle_{timeframe}" if f"BB_middle_{timeframe}" in data.columns else "BB_middle"
+                    lower = f"BB_lower_{timeframe}" if f"BB_lower_{timeframe}" in data.columns else "BB_lower"
+                    if upper in data.columns:
+                        fig.add_trace(go.Scatter(x=data.index, y=data[upper], name="BB Upper"), row=i, col=1)
+                    if middle in data.columns:
+                        fig.add_trace(go.Scatter(x=data.index, y=data[middle], name="BB Middle"), row=i, col=1)
+                    if lower in data.columns:
+                        fig.add_trace(go.Scatter(x=data.index, y=data[lower], name="BB Lower"), row=i, col=1)
             # Support/Resistance
             if levels:
                 for s in levels.get("support", []):
                     fig.add_hline(y=s, line_dash="dot", line_color="green", annotation_text="Support", row=i, col=1)
                 for r in levels.get("resistance", []):
                     fig.add_hline(y=r, line_dash="dot", line_color="red", annotation_text="Resistance", row=i, col=1)
-        elif title == "RSI" and data_key in data.columns:
-            fig.add_trace(go.Scatter(x=data.index, y=data[data_key], name="RSI", line=dict(color="blue")), row=i, col=1)
-            fig.add_hline(y=70, line_dash="dash", line_color="red", row=i, col=1)
-            fig.add_hline(y=30, line_dash="dash", line_color="green", row=i, col=1)
+        elif title == "RSI":
+            col = f"RSI_{timeframe}" if f"RSI_{timeframe}" in data.columns else "RSI"
+            if col in data.columns:
+                fig.add_trace(go.Scatter(x=data.index, y=data[col], name="RSI", line=dict(color="blue")), row=i, col=1)
+                fig.add_hline(y=70, line_dash="dash", line_color="red", row=i, col=1)
+                fig.add_hline(y=30, line_dash="dash", line_color="green", row=i, col=1)
         elif title == "MACD":
-            if all(k in data.columns for k in data_key):
-                fig.add_trace(go.Scatter(x=data.index, y=data[data_key[0]], name="MACD", line=dict(color="purple")), row=i, col=1)
-                fig.add_trace(go.Scatter(x=data.index, y=data[data_key[1]], name="Signal", line=dict(color="orange")), row=i, col=1)
-        elif title == "ADX" and data_key in data.columns:
-            fig.add_trace(go.Scatter(x=data.index, y=data[data_key], name="ADX", line=dict(color="darkviolet")), row=i, col=1)
+            macd_col = f"MACD_{timeframe}" if f"MACD_{timeframe}" in data.columns else "MACD"
+            signal_col = f"MACD_Signal_{timeframe}" if f"MACD_Signal_{timeframe}" in data.columns else "MACD_Signal"
+            if macd_col in data.columns and signal_col in data.columns:
+                fig.add_trace(go.Scatter(x=data.index, y=data[macd_col], name="MACD", line=dict(color="purple")), row=i, col=1)
+                fig.add_trace(go.Scatter(x=data.index, y=data[signal_col], name="Signal", line=dict(color="orange")), row=i, col=1)
+        elif title == "ADX":
+            col = f"ADX_{timeframe}" if f"ADX_{timeframe}" in data.columns else "ADX"
+            if col in data.columns:
+                fig.add_trace(go.Scatter(x=data.index, y=data[col], name="ADX", line=dict(color="darkviolet")), row=i, col=1)
         elif title == "Stochastic":
-            if all(k in data.columns for k in data_key):
-                fig.add_trace(go.Scatter(x=data.index, y=data[data_key[0]], name="%K", line=dict(color="blue")), row=i, col=1)
-                fig.add_trace(go.Scatter(x=data.index, y=data[data_key[1]], name="%D", line=dict(color="green")), row=i, col=1)
-        elif title == "OBV" and data_key in data.columns:
-            fig.add_trace(go.Scatter(x=data.index, y=data[data_key], name="OBV", line=dict(color="orange")), row=i, col=1)
-        elif title == "ATR" and data_key in data.columns:
-            fig.add_trace(go.Scatter(x=data.index, y=data[data_key], name="ATR", line=dict(color="gray")), row=i, col=1)
+            k_col = f"STOCH_%K_{timeframe}" if f"STOCH_%K_{timeframe}" in data.columns else "STOCH_%K"
+            d_col = f"STOCH_%D_{timeframe}" if f"STOCH_%D_{timeframe}" in data.columns else "STOCH_%D"
+            if k_col in data.columns:
+                fig.add_trace(go.Scatter(x=data.index, y=data[k_col], name="%K", line=dict(color="blue")), row=i, col=1)
+            if d_col in data.columns:
+                fig.add_trace(go.Scatter(x=data.index, y=data[d_col], name="%D", line=dict(color="green")), row=i, col=1)
+        elif title == "OBV":
+            col = f"OBV_{timeframe}" if f"OBV_{timeframe}" in data.columns else "OBV"
+            if col in data.columns:
+                fig.add_trace(go.Scatter(x=data.index, y=data[col], name="OBV", line=dict(color="orange")), row=i, col=1)
+        elif title == "ATR":
+            col = f"ATR_{timeframe}" if f"ATR_{timeframe}" in data.columns else "ATR"
+            if col in data.columns:
+                fig.add_trace(go.Scatter(x=data.index, y=data[col], name="ATR", line=dict(color="gray")), row=i, col=1)
         elif title == "Volume":
-            fig.add_trace(go.Bar(x=data.index, y=data['Volume'], name="Volume", marker_color="lightblue"), row=i, col=1)
+            if "Volume" in data.columns:
+                fig.add_trace(go.Bar(x=data.index, y=data['Volume'], name="Volume", marker_color="lightblue"), row=i, col=1)
+
+    # Calculate a padded y-axis range if not provided
+    if yaxis_range is None:
+        min_price = data['Low'].min()
+        max_price = data['High'].max()
+        price_padding = (max_price - min_price) * 0.05  # 5% padding
+        yaxis_range = [min_price - price_padding, max_price + price_padding]
+
+    # Show the full chart for the selected timeframe
+    if xaxis_range is None:
+        xaxis_range = [data.index.min(), data.index.max()]
 
     # 4. Final layout
     fig.update_layout(
         height=300 + len(rows_to_plot) * 150,
         showlegend=True,
-        xaxis_rangeslider_visible=False,
+        xaxis_rangeslider_visible=True,
         template="plotly_white"
     )
+    fig.update_yaxes(range=yaxis_range, row=1, col=1)
+    fig.update_xaxes(range=xaxis_range, row=1, col=1)
     return fig
 
 # =========================
@@ -171,7 +212,8 @@ def create_enhanced_chart(
         show_stoch=show_stoch,
         show_obv=show_obv,
         show_atr=show_atr,
-        timeframe=interval
+        timeframe=interval,
+        # yaxis_range and xaxis_range are handled automatically
     )
     # Strategy-specific enhancements
     if strategy_type and "Short-Term" in strategy_type:

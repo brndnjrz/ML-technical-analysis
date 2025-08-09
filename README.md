@@ -6,6 +6,16 @@
 This project provides an **AI-powered technical stock analysis dashboard** built with Streamlit, Plotly, and advanced technical analysis tools. The dashboard features a modern, interactive UI, dynamic strategy and indicator selection, and AI-driven market analysis with PDF reporting.
 
 **Key Features (2025 Update):**
+- Multi-Agent AI System for Comprehensive Market Analysis:
+  - AnalystAgent: Deep technical and fundamental analysis
+  - StrategyAgent: Advanced trading strategy development
+  - ExecutionAgent: Precise entry/exit points and position sizing
+  - BacktestAgent: Historical performance validation
+- Enhanced PDF Report Generation:
+  - Professional-grade formatting with proper indicator display
+  - Multi-timeframe analysis integration
+  - Automatic chart integration and cleanup
+  - Unicode and emoji support with trading-specific conversions
 - Modular codebase with enhanced ML model selection (RandomForest, XGBoost, CatBoost)
 - Real-time data fetching and analysis by default
 - Combined technical and fundamental metrics for analytics and AI prediction
@@ -39,7 +49,14 @@ This project provides an **AI-powered technical stock analysis dashboard** built
 │   ├── indicators.py         # Technical indicator calculations
 │   ├── plotter.py           # Charting utilities
 │   ├── ai_analysis.py       # AI prompt and analysis logic
-│   ├── pdf_utils.py         # PDF generation and display
+│   ├── ai_agents/
+│   │   ├── __init__.py      # Agent system initialization
+│   │   ├── analyst.py       # Technical/Fundamental analysis agent
+│   │   ├── strategy.py      # Strategy development agent
+│   │   ├── execution.py     # Trade execution agent
+│   │   └── backtest.py      # Strategy validation agent
+│   ├── pdf_generator.py     # PDF document generation
+│   ├── pdf_utils.py         # PDF utilities and display
 │   ├── data_pipeline.py     # Data processing pipeline
 │   ├── prediction.py        # ML models and feature engineering
 │   ├── ui_components.py     # UI components and layouts
@@ -94,8 +111,34 @@ This project provides an **AI-powered technical stock analysis dashboard** built
 - Automatic handling of missing values and data cleaning
 - Real-time prediction confidence scoring
 - Contextual AI analysis based on prediction results
-- Results are displayed in the dashboard.
-- Users can generate a comprehensive PDF report (with chart, analysis, indicators, and risk metrics) for preview and download.
+
+### **6. Multi-Agent AI System**
+- **AnalystAgent:**
+  - Performs deep technical and fundamental analysis
+  - Integrates multiple timeframe data
+  - Identifies key market patterns and trends
+- **StrategyAgent:**
+  - Develops customized trading strategies
+  - Optimizes strategy parameters
+  - Provides risk-adjusted recommendations
+- **ExecutionAgent:**
+  - Determines optimal entry/exit points
+  - Calculates position sizing
+  - Manages risk parameters
+- **BacktestAgent:**
+  - Validates strategies on historical data
+  - Provides performance metrics
+  - Identifies market condition compatibility
+
+### **7. Enhanced PDF Report Generation**
+- Professional-grade formatting with proper indicator display
+- Automatic chart integration with smart sizing
+- Multi-timeframe analysis presentation
+- Unicode and emoji support for clear communication
+- Automatic temporary file cleanup
+- Interactive PDF preview in dashboard
+- One-click PDF download with complete analysis
+- Support for all technical indicators and AI insights
 
 
 
@@ -163,7 +206,7 @@ conda deactivate <ENV_NAME>
    - Keep this terminal open while using the dashboard.
 2. In a new terminal, install the required libraries:
    ```bash
-   pip install streamlit plotly ollama pandas yfinance scikit-learn xgboost catboost
+   pip3 install streamlit plotly ollama pandas pandas_t yfinance scikit-learn xgboost catboost
    ```
 3. Run the app:
    ```bash

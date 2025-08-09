@@ -287,7 +287,7 @@ def render_sidebar_quick_stats(data, interval):
 
     bb_middle = safe_get_indicator_value(data, "BB_middle", current_timeframe)
     bb_width = None
-    if bb_middle is not None:
+    if bb_middle is not None and bb_middle != 0 and not pd.isna(bb_middle):
         bb_upper = safe_get_indicator_value(data, "BB_upper", current_timeframe)
         bb_lower = safe_get_indicator_value(data, "BB_lower", current_timeframe)
         if bb_upper is not None and bb_lower is not None:
