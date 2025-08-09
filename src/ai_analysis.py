@@ -5,6 +5,7 @@ import tempfile
 from src.ai_agents import HedgeFundAI
 import pandas as pd
 import json
+import time
 
 def run_ai_analysis(fig, data: pd.DataFrame, ticker: str, prompt: str):
     """Run enhanced AI analysis using both vision model and agent system"""
@@ -14,7 +15,8 @@ def run_ai_analysis(fig, data: pd.DataFrame, ticker: str, prompt: str):
     current_price = data['Close'].iloc[-1]
     
     recommendation = ai_system.analyze_and_recommend(data, ticker, current_price)
-    
+    print("DEBUG: recommendation =", recommendation)
+
     # 2. Get Vision Model Analysis
     buf = io.BytesIO()
     fig.write_image(buf, format='png')
@@ -40,7 +42,10 @@ def run_ai_analysis(fig, data: pd.DataFrame, ticker: str, prompt: str):
         'content': enhanced_prompt,
         'images': [image_data]
     }]
+    print("DEBUG: About to call ollama.chat")
+    start_time = time.time()
     vision_response = ollama.chat(model='llama3.2-vision', messages=messages)
+    print("DEBUG: ollama.chat finished in", time.time() - start_time, "seconds")
     
     # Combine both analyses
     combined_analysis = f"""
@@ -55,10 +60,10 @@ def run_ai_analysis(fig, data: pd.DataFrame, ticker: str, prompt: str):
     💡 Strategy Recommendation:
     - Strategy: {recommendation['strategy']['name']}
     - Confidence: {recommendation['strategy']['confidence'] * 100:.0f}%
-    - Risk Level: {recommendation['strategy']['risk_level']}
+    - Risk Level: {recommendation['risk_assessment']['risk_level']}
     
     📈 Trade Parameters:
-    {json.dumps(recommendation['parameters'], indent=2)}
+    {json.dumps(recommendation['strategy'].get('parameters', {}), indent=2)}
     
     👁️ Visual Analysis:
     {vision_response['message']['content']}

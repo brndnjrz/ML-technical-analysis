@@ -5,6 +5,7 @@
 import yfinance as yf
 import datetime
 import pandas as pd
+import logging 
 
 # =========================
 # Constants
@@ -97,7 +98,8 @@ def fetch_stock_data(ticker, start_date=None, end_date=None, interval="1d"):
 
         # Fetch fundamental data
         fundamentals = get_fundamental_data(ticker)
-        print(f"[Info] Fundamental data: {fundamentals}")
+        # print(f"[Info] Fundamental data: {fundamentals}")
+        logging.info(f"Fundamental data for {ticker}: {fundamentals}")
 
         # Fetch data based on interval
         if interval in VALID_INTRADAY_INTERVALS:
@@ -112,7 +114,8 @@ def fetch_stock_data(ticker, start_date=None, end_date=None, interval="1d"):
             print(f"[Warning] No data returned for {ticker} with interval {interval}")
             return None
 
-        print(f"[Debug] Original columns: {df.columns.tolist()}")
+        # print(f"[Debug] Original columns: {df.columns.tolist()}")
+        logging.debug(f"Original columns: {df.columns.tolist()}")
 
         # Standardize column names
         df = df.rename(columns=COLUMN_MAPPING)
@@ -141,8 +144,10 @@ def fetch_stock_data(ticker, start_date=None, end_date=None, interval="1d"):
         if not isinstance(df.index, pd.DatetimeIndex):
             df.index = pd.to_datetime(df.index)
 
-        print(f"[Success] Fetched {len(df)} rows for {ticker}")
-        print(f"[Success] Final columns: {df.columns.tolist()}")
+        # print(f"[Success] Fetched {len(df)} rows for {ticker}")
+        # print(f"[Success] Final columns: {df.columns.tolist()}")
+        logging.info(f"Fetched {len(df)} rows for {ticker}")
+        logging.info(f"Final columns: {df.columns.tolist()}")
         return df
 
     except Exception as e:
