@@ -107,6 +107,28 @@ model_type = st.sidebar.selectbox(
     help="Choose which machine learning model to use for price prediction."
 )
 
+# --- Vision Analysis Settings ---
+st.sidebar.markdown("### 👁️ Vision Analysis Settings")
+vision_timeout = st.sidebar.slider(
+    "Vision Analysis Timeout (seconds)",
+    min_value=30,
+    max_value=3000,
+    value=90,
+    step=30,
+    help="Adjust timeout for AI vision analysis. Increase if you experience frequent timeouts."
+)
+
+if vision_timeout > 1000:
+    st.sidebar.warning("⚠️ Long timeouts may slow down analysis")
+elif vision_timeout < 60:
+    st.sidebar.info("ℹ️ Short timeouts may cause analysis failures")
+
+enable_vision_analysis = st.sidebar.checkbox(
+    "Enable Vision Analysis", 
+    value=True, 
+    help="Uncheck to skip chart vision analysis and speed up processing"
+)
+
 # --- Modular Sidebar ---
 # Stock ticker, date range, timeframee/interval, analysis type, strategy type, technical indicators
 ticker, start_date, end_date, interval, analysis_type, strategy_type, options_strategy = sidebar_config(config)
@@ -479,13 +501,26 @@ PRICE CHANGE: ${price_change:.2f} ({(price_change/data['Close'].iloc[-1]*100):.1
             status_text.text("🧠 Running AI analysis...")
             progress_bar.progress(60)
             
-            # Run AI analysis
+            # Run AI analysis with user-configured settings
             try:
+                # Use user-defined timeout, with strategy-based adjustment
+                if "Short-Term" in strategy_type:
+                    adjusted_timeout = max(vision_timeout - 30, 30)  # Reduce for short-term
+                else:
+                    adjusted_timeout = vision_timeout
+                
+                if enable_vision_analysis:
+                    status_text.text(f"🧠 Running AI analysis (Vision timeout: {adjusted_timeout}s)...")
+                else:
+                    status_text.text("🧠 Running AI analysis (Vision analysis disabled)...")
+                    adjusted_timeout = 0  # Skip vision analysis
+                
                 analysis, recommendation = ai_analysis.run_ai_analysis(
                     fig=fig,
                     data=data,
                     ticker=ticker,
-                    prompt=prompt
+                    prompt=prompt,
+                    vision_timeout=adjusted_timeout
                 )
                 
                 # Step 4: Complete Analysis (100%)
