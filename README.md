@@ -206,7 +206,7 @@ conda deactivate <ENV_NAME>
    - Keep this terminal open while using the dashboard.
 2. In a new terminal, install the required libraries:
    ```bash
-   pip3 install streamlit plotly ollama pandas pandas_t yfinance scikit-learn xgboost catboost
+   pip3 install streamlit plotly ollama pandas pandas_ta fpdf kaleido yfinance scikit-learn xgboost catboost
    ```
 3. Run the app:
    ```bash
