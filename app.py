@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import os
 import logging 
+import re
 from src import plotter, ai_analysis, config
 from src.data_pipeline import fetch_and_process_data
 from src.prediction import get_fundamental_metrics, predict_next_day_close
@@ -21,6 +22,65 @@ logging.getLogger('requests').setLevel(logging.WARNING)
 
 # Clean up old temp files on startup
 cleanup_old_temp_files()
+
+def format_analysis_text(text):
+    """Clean and format analysis text for better readability"""
+    if not text:
+        return "No analysis available"
+    
+    # Fix character encoding issues
+    text = text.replace('�', '📊')  # Replace broken characters with appropriate emoji
+    
+    # Clean up markdown formatting
+    text = re.sub(r'\*{3,}', '**', text)  # Replace triple asterisks with double
+    text = re.sub(r'#{3,}', '### ', text)  # Clean up header formatting
+    
+    # Fix common formatting issues
+    text = text.replace('**:**', ':**')  # Fix double colons
+    text = text.replace('- -', '-')  # Fix double dashes
+    
+    # Format JSON trade parameters into readable format
+    def format_trade_params(match):
+        import json
+        json_str = match.group(0)
+        try:
+            # Clean up the JSON string
+            json_str = re.sub(r'^[^{]*{', '{', json_str)
+            json_str = re.sub(r'}[^}]*$', '}', json_str)
+            
+            params = json.loads(json_str)
+            formatted_lines = []
+            
+            for key, value in params.items():
+                formatted_key = key.replace('_', ' ').title()
+                
+                if isinstance(value, bool):
+                    formatted_value = "✅ Yes" if value else "❌ No"
+                elif isinstance(value, (int, float)):
+                    if 'price' in key.lower() or 'stop' in key.lower() or 'target' in key.lower():
+                        formatted_value = f"${value:.2f}"
+                    elif 'period' in key.lower() or 'ma' in key.lower():
+                        formatted_value = f"{value} periods"
+                    else:
+                        formatted_value = f"{value:.2f}"
+                else:
+                    formatted_value = str(value).replace('_', ' ').title()
+                
+                formatted_lines.append(f"- **{formatted_key}:** {formatted_value}")
+            
+            return '\n'.join(formatted_lines)
+            
+        except (json.JSONDecodeError, ValueError):
+            # If JSON parsing fails, return original text
+            return json_str
+    
+    # Replace JSON blocks with formatted parameters
+    text = re.sub(r'\{[^}]*"[^"]*"[^}]*\}', format_trade_params, text)
+    
+    # Ensure proper spacing around sections
+    text = re.sub(r'([🤖📊💡📈👁️⚠️].+?)(\n)([^-•\s])', r'\1\n\n\3', text)
+    
+    return text.strip()
 
 # Set Up Streamlit App UI 
 st.set_page_config(page_title="AI Technical Analysis", layout="wide")
@@ -456,71 +516,220 @@ PRICE CHANGE: ${price_change:.2f} ({(price_change/data['Close'].iloc[-1]*100):.1
     if st.session_state.get("ai_analysis_result"):
         analysis, chart_path, recommendation = st.session_state["ai_analysis_result"]
         
-        # Display Analysis Results
-        st.markdown("### 📋 AI Trading Analysis")
+        # Display Analysis Results with Enhanced Formatting
+        st.markdown("### 🤖 AI Trading Analysis Results")
+        st.markdown("---")  # Add a separator line
         
-        # Strategy Overview
+        # Quick Summary Card
+        if recommendation:
+            action = recommendation.get('action', 'Hold').upper()
+            strategy_name = recommendation.get('strategy', {}).get('name', 'No Strategy')
+            confidence = recommendation.get('strategy', {}).get('confidence', 0) * 100
+            
+            # Color code the action
+            if action == 'BUY':
+                action_color = "🟢"
+                action_style = "success"
+            elif action == 'SELL':
+                action_color = "🔴"
+                action_style = "error"
+            else:
+                action_color = "🟡"
+                action_style = "info"
+            
+            st.markdown(f"""
+            <div style="
+                background: linear-gradient(90deg, #f0f2f6 0%, #ffffff 100%);
+                padding: 20px;
+                border-radius: 10px;
+                border-left: 5px solid #1f77b4;
+                margin: 10px 0;
+            ">
+                <h4 style="margin: 0; color: #1f77b4;">📋 Analysis Summary</h4>
+                <p style="margin: 5px 0; font-size: 18px;">
+                    <strong>Recommendation:</strong> {action_color} <strong>{action}</strong> 
+                    | <strong>Strategy:</strong> {strategy_name} 
+                    | <strong>Confidence:</strong> {confidence:.0f}%
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        # Strategy Overview with better styling
         if recommendation and 'strategy' in recommendation:
             strategy = recommendation['strategy']
+            
+            st.markdown("#### 🎯 Strategy Overview")
             col1, col2, col3 = st.columns(3)
             with col1:
-                st.metric("Strategy", strategy.get('name', 'N/A'))
+                strategy_name = strategy.get('name', 'N/A')
+                st.metric("Strategy", strategy_name, help="Recommended trading strategy")
             with col2:
-                st.metric("Confidence", f"{strategy.get('confidence', 0) * 100:.0f}%")
+                confidence = strategy.get('confidence', 0) * 100
+                confidence_color = "🟢" if confidence >= 70 else "🟡" if confidence >= 50 else "🔴"
+                st.metric("Confidence", f"{confidence:.0f}%", help="AI confidence level")
             with col3:
                 # Fix: get risk_level from risk_assessment, not strategy
                 risk_level = recommendation.get('risk_assessment', {}).get('risk_level', 'N/A')
-                st.metric("Risk Level", str(risk_level).upper())
+                risk_color = "🔴" if str(risk_level).upper() == "HIGH" else "🟡" if str(risk_level).upper() == "MEDIUM" else "🟢"
+                st.metric("Risk Level", f"{risk_color} {str(risk_level).upper()}", help="Assessed risk level")
         
-        # Market Analysis Metrics
+        # Market Analysis Metrics with improved presentation
         if recommendation and 'market_analysis' in recommendation:
             market = recommendation['market_analysis']
-            st.markdown("#### 📊 Market Conditions")
+            st.markdown("#### 📊 Current Market Conditions")
+            
             metrics_col1, metrics_col2, metrics_col3, metrics_col4 = st.columns(4)
             with metrics_col1:
-                st.metric("RSI", f"{market.get('RSI', 0):.2f}")
+                rsi_val = market.get('RSI', 0)
+                rsi_signal = "🔴 Overbought" if rsi_val > 70 else "🟢 Oversold" if rsi_val < 30 else "🟡 Neutral"
+                st.metric("RSI", f"{rsi_val:.1f}", help=f"Relative Strength Index: {rsi_signal}")
             with metrics_col2:
-                st.metric("MACD Signal", market.get('MACD_Signal', 'N/A'))
+                macd_signal = market.get('MACD_Signal', 'N/A')
+                macd_emoji = "🟢" if macd_signal == "bullish" else "🔴" if macd_signal == "bearish" else "🟡"
+                st.metric("MACD", f"{macd_emoji} {str(macd_signal).title()}", help="MACD trend signal")
             with metrics_col3:
-                st.metric("Volume", market.get('volume_signal', 'N/A'))
+                volume_signal = market.get('volume_signal', 'N/A')
+                volume_emoji = "🟢" if volume_signal == "high" else "🔴" if volume_signal == "low" else "🟡"
+                st.metric("Volume", f"{volume_emoji} {str(volume_signal).title()}", help="Trading volume analysis")
             with metrics_col4:
-                st.metric("Trend Strength", f"{market.get('trend_strength', 0):.2f}")
+                trend_strength = market.get('trend_strength', 0)
+                trend_signal = "💪 Strong" if trend_strength > 25 else "📈 Weak" if trend_strength > 15 else "➡️ Sideways"
+                st.metric("Trend (ADX)", f"{trend_strength:.1f}", help=f"Trend strength: {trend_signal}")
         
-        # Trade Parameters
+        # Trade Parameters - Format in a more readable way
         if recommendation and 'parameters' in recommendation and recommendation['parameters']:
             st.markdown("#### 📈 Trade Parameters")
-            st.json(recommendation['parameters'])
-        
-        # Full Analysis
-        st.markdown("#### � Detailed Analysis")
-        st.markdown(analysis)
-        # Enhanced PDF Generation
-        if st.button("📄 Generate Detailed Report"):
-            with st.spinner("Generating comprehensive report..."):
-                try:
-                    generate_and_display_pdf(
-                        ticker, strategy_type, options_strategy, data, analysis, chart_path, levels, options_data, st.session_state["active_indicators"]
-                    )
-                    print("✅ PDF report generated successfully")
+            params = recommendation['parameters']
+            
+            # Create formatted parameter display
+            param_col1, param_col2 = st.columns(2)
+            
+            with param_col1:
+                if 'entry_condition' in params:
+                    st.info(f"**Entry Condition:** {params['entry_condition'].replace('_', ' ').title()}")
+                if 'stop_loss' in params:
+                    try:
+                        stop_loss_val = float(params['stop_loss'])
+                        st.error(f"**Stop Loss:** ${stop_loss_val:.2f}")
+                    except (ValueError, TypeError):
+                        st.error(f"**Stop Loss:** {params['stop_loss']}")
+                        
+            with param_col2:
+                if 'exit_condition' in params:
+                    st.info(f"**Exit Condition:** {params['exit_condition'].replace('_', ' ').title()}")
+                if 'profit_target' in params:
+                    try:
+                        profit_val = float(params['profit_target'])
+                        st.success(f"**Profit Target:** ${profit_val:.2f}")
+                    except (ValueError, TypeError):
+                        st.success(f"**Profit Target:** {params['profit_target']}")
+                        
+            # Additional parameters in a clean format
+            other_params = {k: v for k, v in params.items() 
+                          if k not in ['entry_condition', 'exit_condition', 'stop_loss', 'profit_target']}
+            
+            if other_params:
+                st.markdown("**Additional Parameters:**")
+                for key, value in other_params.items():
+                    formatted_key = key.replace('_', ' ').title()
+                    if isinstance(value, bool):
+                        value_display = "✅ Yes" if value else "❌ No"
+                    elif isinstance(value, (int, float)):
+                        if 'period' in key.lower() or 'ma' in key.lower():
+                            value_display = f"{value} periods"
+                        else:
+                            value_display = f"{value:.2f}"
+                    else:
+                        value_display = str(value).replace('_', ' ').title()
                     
-                    # Clean up temporary chart file after PDF generation
-                    if chart_path and os.path.exists(chart_path):
-                        temp_manager.cleanup_file(chart_path)
-                        print(f"🗑️ Cleaned up temporary chart: {chart_path}")
-                except Exception as e:
-                    st.error(f"Error generating PDF: {e}")
-                    print(f"❌ PDF generation error: {e}")
+                    st.write(f"• **{formatted_key}:** {value_display}")
+        
+        # Enhanced Analysis Display
+        st.markdown("#### 📝 Detailed Analysis")
+        
+        # Clean up the analysis text and format it better
+        if analysis:
+            # Clean and format the analysis text
+            cleaned_analysis = format_analysis_text(analysis)
+            
+            # Split analysis into sections for better formatting
+            sections = cleaned_analysis.split('\n\n')
+            
+            for i, section in enumerate(sections):
+                if section.strip():
+                    # Check if it's a header-like section with emoji
+                    if any(emoji in section for emoji in ['🤖', '📊', '💡', '📈', '👁️', '⚠️', '🔍']):
+                        lines = section.strip().split('\n')
+                        if len(lines) > 1:
+                            header = lines[0].strip()
+                            content = '\n'.join(lines[1:]).strip()
+                            
+                            # Use expander for long sections, regular markdown for short ones
+                            if len(content) > 200:
+                                with st.expander(header, expanded=i < 2):  # Expand first two sections
+                                    if content:
+                                        # Format bullet points and content
+                                        formatted_content = content.replace('- ', '• ').replace('*', '')
+                                        st.markdown(formatted_content)
+                            else:
+                                st.markdown(f"**{header}**")
+                                if content:
+                                    formatted_content = content.replace('- ', '• ').replace('*', '')
+                                    st.markdown(formatted_content)
+                                st.markdown("---")  # Add separator
+                        else:
+                            st.markdown(f"### {section.strip()}")
+                    else:
+                        # Regular content formatting
+                        if section.strip().startswith('-') or section.strip().startswith('•'):
+                            # Format as bullet points in an info box
+                            bullet_points = section.strip().replace('- ', '• ').replace('*', '')
+                            st.info(bullet_points)
+                        elif len(section.strip()) > 100:
+                            # Long text in a container
+                            with st.container():
+                                st.markdown(section.strip().replace('*', ''))
+                        else:
+                            # Short text as regular markdown
+                            st.markdown(section.strip().replace('*', ''))
+        else:
+            st.info("📝 No detailed analysis available. Please run the analysis to get AI insights.")
+        
+        # Action Buttons Section
+        st.markdown("---")
+        st.markdown("#### 📋 Report & Actions")
+        
+        button_col1, button_col2 = st.columns(2)
+        
+        with button_col1:
+            # Enhanced PDF Generation
+            if st.button("📄 Generate Detailed Report", use_container_width=True):
+                with st.spinner("Generating comprehensive report..."):
+                    try:
+                        generate_and_display_pdf(
+                            ticker, strategy_type, options_strategy, data, analysis, chart_path, levels, options_data, st.session_state["active_indicators"]
+                        )
+                        st.success("✅ PDF report generated successfully!")
+                        print("✅ PDF report generated successfully")
+                        
+                        # Clean up temporary chart file after PDF generation
+                        if chart_path and os.path.exists(chart_path):
+                            temp_manager.cleanup_file(chart_path)
+                            print(f"🗑️ Cleaned up temporary chart: {chart_path}")
+                    except Exception as e:
+                        st.error(f"❌ Error generating PDF: {e}")
+                        print(f"❌ PDF generation error: {e}")
+        
+        with button_col2:
+            # Clean up temp files when user closes analysis
+            if st.button("🗑️ Clear Analysis & Clean Temp Files", use_container_width=True):
+                if "ai_analysis_result" in st.session_state:
+                    del st.session_state["ai_analysis_result"]
+                temp_manager.cleanup_all()
+                st.success("✅ Analysis cleared and temporary files cleaned up!")
+                st.rerun()
 
         st.session_state["ai_analysis_running"] = False
-
-        # Optional: Clean up temp files when user closes analysis
-        if st.button("🗑️ Clear Analysis & Clean Temp Files"):
-            if "ai_analysis_result" in st.session_state:
-                del st.session_state["ai_analysis_result"]
-            temp_manager.cleanup_all()
-            st.success("Analysis cleared and temporary files cleaned up!")
-            st.rerun()
-
 
 
 # --- SIDEBAR: QUICK STATS ---

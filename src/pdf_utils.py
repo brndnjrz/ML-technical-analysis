@@ -8,6 +8,9 @@ from src import pdf_generator
 
 def sanitize_text(text):
     """Remove emojis and non-Latin characters from text for PDF compatibility."""
+    if not text:
+        return ""
+    
     # Remove emojis and other special characters
     emoji_pattern = re.compile("["
         u"\U0001F600-\U0001F64F"  # emoticons
@@ -21,19 +24,23 @@ def sanitize_text(text):
         u"\U0001F916"             # robot face
         "]+", flags=re.UNICODE)
     
-    # Replace emojis with their text equivalents
+    # Replace emojis with their text equivalents first
     replacements = {
-        "🤖": "[AI]",
-        "📊": "[Chart]",
-        "💡": "[Insight]",
-        "📈": "[Trend]",
-        "🔍": "[Analysis]",
-        "⚠️": "[Warning]",
-        "✅": "[Success]",
-        "❌": "[Fail]",
-        "🟢": "[Long]",
-        "🔴": "[Short]",
-        "🔵": "[Neutral]"
+        "🤖": "[AI Analysis]",
+        "📊": "[Market Data]",
+        "💡": "[Strategy Insight]",
+        "📈": "[Trade Parameters]",
+        "🔍": "[Detailed Analysis]",
+        "⚠️": "[Risk Warning]",
+        "✅": "[Positive Signal]",
+        "❌": "[Negative Signal]",
+        "🟢": "[Long Signal]",
+        "🔴": "[Short Signal]",
+        "🔵": "[Neutral Signal]",
+        "👁️": "[Visual Analysis]",
+        "💰": "[Profit Target]",
+        "📉": "[Bearish Signal]",
+        "📋": "[Summary]"
     }
     
     for emoji, replacement in replacements.items():
@@ -42,13 +49,27 @@ def sanitize_text(text):
     # Remove any remaining emojis
     text = emoji_pattern.sub(r'', text)
     
+    # Fix character encoding issues
+    text = text.replace('�', '[Analysis]')  # Replace broken Unicode characters
+    text = text.replace('\ufffd', '[Data]')  # Replace Unicode replacement character
+    
     # Replace other problematic characters
     text = text.replace('–', '-')
     text = text.replace('—', '-')
     text = text.replace('"', '"')
     text = text.replace('"', '"')
     text = text.replace("'", "'")
+    text = text.replace("'", "'")
     text = text.replace("…", "...")
+    
+    # Replace Unicode bullet characters with ASCII dashes
+    text = text.replace('\u2022', '-')  # Unicode bullet
+    text = text.replace('•', '-')       # Bullet character
+    
+    # Clean up extra whitespace and line breaks
+    text = re.sub(r'\n\s*\n', '\n\n', text)  # Multiple newlines to double newline
+    text = re.sub(r' +', ' ', text)  # Multiple spaces to single space
+    text = text.strip()
     
     return text
 

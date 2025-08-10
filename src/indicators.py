@@ -155,7 +155,9 @@ def log_calculated_indicators(df: pd.DataFrame, timeframe: str):
             '⚡ Momentum Indicators': {
                 'RSI': 'RSI(14)',
                 'MACD': 'MACD Line',
-                'MACD_Signal': 'MACD Signal'
+                'MACD_Signal': 'MACD Signal',
+                'STOCH_%K': 'Stochastic %K',
+                'STOCH_%D': 'Stochastic %D'
             },
             '📊 Volatility Indicators': {
                 'ATR': 'ATR(14)',
@@ -201,7 +203,7 @@ def log_calculated_indicators(df: pd.DataFrame, timeframe: str):
         # Log timeframe-specific indicators if they exist
         timeframe_indicators = []
         timeframe_cols = [f'RSI_{timeframe}', f'MACD_{timeframe}', f'ADX_{timeframe}', 
-                         f'ATR_{timeframe}', f'OBV_{timeframe}']
+                         f'ATR_{timeframe}', f'OBV_{timeframe}', f'STOCH_%K_{timeframe}', f'STOCH_%D_{timeframe}']
         
         for col in timeframe_cols:
             if col in df.columns and pd.notna(latest[col]):
@@ -278,10 +280,24 @@ def calculate_indicators(data: pd.DataFrame,
         df['SMA_50'] = df['Close'].rolling(window=50, min_periods=50).mean()
         df['EMA_20'] = df['Close'].ewm(span=20, adjust=False, min_periods=20).mean()
         df['EMA_50'] = df['Close'].ewm(span=50, adjust=False, min_periods=50).mean()
+        
+        # Forward fill early NaN values for better chart appearance
+        df['SMA_20'] = df['SMA_20'].bfill().fillna(df['Close'])
+        df['SMA_50'] = df['SMA_50'].bfill().fillna(df['Close'])
+        df['EMA_20'] = df['EMA_20'].bfill().fillna(df['Close'])
+        df['EMA_50'] = df['EMA_50'].bfill().fillna(df['Close'])
+        
+        # Add timeframe-specific moving averages
+        df[f'SMA_20_{timeframe}'] = df['SMA_20']
+        df[f'SMA_50_{timeframe}'] = df['SMA_50']
+        df[f'EMA_20_{timeframe}'] = df['EMA_20']
+        df[f'EMA_50_{timeframe}'] = df['EMA_50']
 
         # --- VWAP ---
         if 'Volume' in df.columns and 'Close' in df.columns:
             df['VWAP'] = (df['Close'] * df['Volume']).cumsum() / df['Volume'].cumsum()
+            # Add timeframe-specific VWAP
+            df[f'VWAP_{timeframe}'] = df['VWAP']
 
         # --- Bollinger Bands ---
         rolling_mean = df['Close'].rolling(window=20, min_periods=20).mean()
@@ -289,6 +305,16 @@ def calculate_indicators(data: pd.DataFrame,
         df['BB_upper'] = rolling_mean + (rolling_std * 2)
         df['BB_middle'] = rolling_mean
         df['BB_lower'] = rolling_mean - (rolling_std * 2)
+        
+        # Forward fill early NaN values for Bollinger Bands
+        df['BB_upper'] = df['BB_upper'].bfill().fillna(df['Close'] * 1.05)
+        df['BB_middle'] = df['BB_middle'].bfill().fillna(df['Close'])
+        df['BB_lower'] = df['BB_lower'].bfill().fillna(df['Close'] * 0.95)
+        
+        # Add timeframe-specific Bollinger Bands
+        df[f'BB_upper_{timeframe}'] = df['BB_upper']
+        df[f'BB_middle_{timeframe}'] = df['BB_middle']
+        df[f'BB_lower_{timeframe}'] = df['BB_lower']
 
         # --- RSI (14) ---
         delta = df['Close'].diff()
@@ -296,6 +322,9 @@ def calculate_indicators(data: pd.DataFrame,
         loss = (-delta.where(delta < 0, 0)).rolling(window=14, min_periods=14).mean()
         rs = gain / loss
         df['RSI'] = 100 - (100 / (1 + rs))
+        
+        # Forward fill early NaN values for RSI (assume neutral 50)
+        df['RSI'] = df['RSI'].bfill().fillna(50)
         
         # Add timeframe-specific RSI
         df[f'RSI_{timeframe}'] = df['RSI']
@@ -307,6 +336,9 @@ def calculate_indicators(data: pd.DataFrame,
         ranges = pd.concat([high_low, high_close, low_close], axis=1)
         true_range = ranges.max(axis=1)
         df['ATR'] = true_range.rolling(window=14, min_periods=14).mean()
+        
+        # Forward fill early NaN values for ATR
+        df['ATR'] = df['ATR'].bfill().fillna(true_range)
         
         # Add timeframe-specific ATR
         df[f'ATR_{timeframe}'] = df['ATR']
@@ -323,6 +355,10 @@ def calculate_indicators(data: pd.DataFrame,
         ema26 = df['Close'].ewm(span=26, adjust=False, min_periods=26).mean()
         df['MACD'] = ema12 - ema26
         df['MACD_Signal'] = df['MACD'].ewm(span=9, adjust=False, min_periods=9).mean()
+        
+        # Forward fill early NaN values for MACD
+        df['MACD'] = df['MACD'].bfill().fillna(0)
+        df['MACD_Signal'] = df['MACD_Signal'].bfill().fillna(0)
         
         # Add timeframe-specific MACD
         df[f'MACD_{timeframe}'] = df['MACD']
@@ -354,6 +390,9 @@ def calculate_indicators(data: pd.DataFrame,
             # Calculate ADX as 14-period smoothed average of DX
             df['ADX'] = dx.rolling(window=14, min_periods=14).mean()
             
+            # Forward fill early NaN values for ADX (assume neutral 25)
+            df['ADX'] = df['ADX'].bfill().fillna(25)
+            
         except Exception as e:
             logger.error(f"Error calculating ADX: {str(e)}")
             df['ADX'] = np.nan
@@ -361,12 +400,47 @@ def calculate_indicators(data: pd.DataFrame,
         # Add timeframe-specific ADX
         df[f'ADX_{timeframe}'] = df['ADX']
 
+        # --- Stochastic Oscillator (14,3,3) ---
+        try:
+            # Calculate %K (Fast Stochastic)
+            low_min = df['Low'].rolling(window=14, min_periods=14).min()
+            high_max = df['High'].rolling(window=14, min_periods=14).max()
+            k_percent = 100 * ((df['Close'] - low_min) / (high_max - low_min))
+            
+            # Calculate %D (Slow Stochastic) - 3-period SMA of %K
+            d_percent = k_percent.rolling(window=3, min_periods=3).mean()
+            
+            df['STOCH_%K'] = k_percent
+            df['STOCH_%D'] = d_percent
+            
+            # Forward fill early NaN values for Stochastic (assume neutral 50)
+            df['STOCH_%K'] = df['STOCH_%K'].bfill().fillna(50)
+            df['STOCH_%D'] = df['STOCH_%D'].bfill().fillna(50)
+            
+            # Add timeframe-specific Stochastic
+            df[f'STOCH_%K_{timeframe}'] = df['STOCH_%K']
+            df[f'STOCH_%D_{timeframe}'] = df['STOCH_%D']
+            
+        except Exception as e:
+            logger.error(f"Error calculating Stochastic: {str(e)}")
+            df['STOCH_%K'] = np.nan
+            df['STOCH_%D'] = np.nan
+            df[f'STOCH_%K_{timeframe}'] = np.nan
+            df[f'STOCH_%D_{timeframe}'] = np.nan
+
         # Ensure all required columns exist for downstream code
         required_cols = [
             'EMA_20', 'EMA_50', 'OBV', 'ATR', 'SMA_20', 'SMA_50', 'RSI', 'MACD', 'MACD_Signal', 'ADX',
             'BB_upper', 'BB_middle', 'BB_lower', 'VWAP', 'Volume', 'returns', 'volatility',
+            'STOCH_%K', 'STOCH_%D',  # Add Stochastic indicators
+            # Timeframe-specific indicators
             f'RSI_{timeframe}', f'MACD_{timeframe}', f'MACD_Signal_{timeframe}', 
-            f'ADX_{timeframe}', f'OBV_{timeframe}', f'ATR_{timeframe}'
+            f'ADX_{timeframe}', f'OBV_{timeframe}', f'ATR_{timeframe}',
+            f'STOCH_%K_{timeframe}', f'STOCH_%D_{timeframe}',  # Stochastic
+            f'SMA_20_{timeframe}', f'SMA_50_{timeframe}',  # Moving averages
+            f'EMA_20_{timeframe}', f'EMA_50_{timeframe}',  # Exponential moving averages
+            f'VWAP_{timeframe}',  # Volume weighted average price
+            f'BB_upper_{timeframe}', f'BB_middle_{timeframe}', f'BB_lower_{timeframe}'  # Bollinger Bands
         ]
         
         for col in required_cols:
@@ -378,6 +452,18 @@ def calculate_indicators(data: pd.DataFrame,
 
         # Log all calculated indicators with their latest values
         log_calculated_indicators(df, timeframe)
+        
+        # Log indicator timing alignment
+        first_valid_indices = {}
+        for col in ['SMA_20', 'SMA_50', 'RSI', 'MACD', 'ATR', 'ADX', 'STOCH_%K']:
+            if col in df.columns:
+                first_valid = df[col].first_valid_index()
+                if first_valid is not None:
+                    first_valid_indices[col] = df.index.get_loc(first_valid)
+        
+        if first_valid_indices:
+            logger.info(f"📊 Indicator Start Alignment: All indicators now start from the beginning of the dataset")
+            logger.info(f"   Note: Early values use forward-fill method for visual consistency")
         
         return df
 
