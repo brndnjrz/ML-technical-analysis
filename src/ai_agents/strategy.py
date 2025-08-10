@@ -1,6 +1,10 @@
 import pandas as pd
 from typing import Dict, Any
 import numpy as np
+import logging
+
+# Setup logger
+logger = logging.getLogger(__name__)
 
 class StrategyAgent:
     """
@@ -12,7 +16,7 @@ class StrategyAgent:
         self.config = config or {}
         
     def develop_strategy(self, analysis: Dict[str, Any], data: pd.DataFrame) -> Dict[str, Any]:
-        print("[StrategyAgent] Developing strategy")
+        logger.debug("💡 Developing trading strategy")
         strategy = {}
         try:
             # Analyze market conditions

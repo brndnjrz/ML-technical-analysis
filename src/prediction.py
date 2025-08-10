@@ -41,24 +41,30 @@ def engineer_features(data: pd.DataFrame) -> pd.DataFrame:
         
         # Volume analysis
         df['Volume_MA'] = ta.sma(df['Volume'], length=20)
-        df['Volume_MA'] = df['Volume_MA'].ffill()  # Updated
+        df['Volume_MA'] = df['Volume_MA'].ffill().infer_objects(copy=False)  # Updated for pandas future
         df['Volume_Trend'] = (df['Volume']/df['Volume_MA']).fillna(1.0)  # Default to neutral
         df['OBV'] = ta.obv(df['Close'], df['Volume'])
-        df['OBV'] = df['OBV'].ffill()  # Updated
+        df['OBV'] = df['OBV'].ffill().infer_objects(copy=False)  # Updated for pandas future
         
         # Volatility indicators
         df['ATR'] = ta.atr(df['High'], df['Low'], df['Close'], length=14)
         bb = ta.bbands(df['Close'])
-        # Handle potential NaN values in Bollinger Bands
-        bb_upper = bb['BBU_5_2.0'].ffill()  # Updated
-        bb_lower = bb['BBL_5_2.0'].ffill()  # Updated
-        bb_middle = bb['BBM_5_2.0'].ffill()  # Updated
-        df['BB_Width'] = ((bb_upper - bb_lower) / bb_middle).fillna(0)
+        # Handle potential NaN values in Bollinger Bands with safe access
+        if bb is not None and not bb.empty:
+            bb_upper = bb.get('BBU_5_2.0', pd.Series()).ffill().infer_objects(copy=False)
+            bb_lower = bb.get('BBL_5_2.0', pd.Series()).ffill().infer_objects(copy=False)
+            bb_middle = bb.get('BBM_5_2.0', pd.Series()).ffill().infer_objects(copy=False)
+            if not bb_middle.empty and not (bb_middle == 0).all():
+                df['BB_Width'] = ((bb_upper - bb_lower) / bb_middle).fillna(0)
+            else:
+                df['BB_Width'] = 0
+        else:
+            df['BB_Width'] = 0
         
         # Fill NaN values with appropriate methods
         # For trend indicators, forward fill is appropriate
         trend_cols = ['SMA_20', 'EMA_20', 'Trend_Strength', 'Volume_MA', 'BB_Width']
-        df[trend_cols] = df[trend_cols].ffill()  # Updated
+        df[trend_cols] = df[trend_cols].ffill().infer_objects(copy=False)  # Updated for pandas future
         
         # For momentum indicators, use median
         momentum_cols = ['RSI', 'RSI_MA', 'RSI_Trend', 'ATR']
@@ -151,6 +157,30 @@ def get_fundamental_metrics(ticker):
 def predict_next_day_close(data: pd.DataFrame, fundamentals: dict, selected_indicators: list, model_type="RandomForest") -> Tuple[float, float]:
     """Predicts the next day's closing price using the selected model."""
     try:
+        # Input validation
+        if data is None or data.empty:
+            logger.error("Input data is None or empty")
+            return None, None
+        
+        if 'Close' not in data.columns:
+            logger.error("'Close' column not found in data")
+            return None, None
+        
+        # Check if we have enough data points
+        if len(data) < 20:
+            logger.error(f"Insufficient data points: {len(data)}. Need at least 20 for reliable predictions.")
+            return None, None
+        
+        # Check for valid Close prices
+        close_values = data['Close'].dropna()
+        if len(close_values) == 0:
+            logger.error("No valid Close prices found")
+            return None, None
+        
+        if (close_values <= 0).any():
+            logger.error("Invalid Close prices (<=0) found in data")
+            return None, None
+        
         # Create a copy to avoid modifying original data
         df = data.copy()
         
@@ -173,19 +203,30 @@ def predict_next_day_close(data: pd.DataFrame, fundamentals: dict, selected_indi
                 df[key] = 0
                 fundamental_cols.append(key)
         
-        # Engineer features
-        df = engineer_features(df)
+        # Engineer features with error handling
+        try:
+            df = engineer_features(df)
+        except Exception as feature_error:
+            logger.warning(f"Feature engineering failed: {feature_error}. Using basic features.")
+            # Fallback to basic features if engineering fails
+            df['Returns'] = df['Close'].pct_change().fillna(0)
+            df['SMA_5'] = df['Close'].rolling(5).mean().fillna(df['Close'])
+            df['SMA_10'] = df['Close'].rolling(10).mean().fillna(df['Close'])
+            df['Volume_MA'] = df['Volume'].rolling(5).mean().fillna(df['Volume']) if 'Volume' in df.columns else df['Close'] * 0
         
         # Calculate additional selected indicators with error handling
         if "RSI" in selected_indicators and "RSI" not in df.columns:
-            df = df.assign(RSI=ta.rsi(df["Close"], length=14))
+            rsi_result = ta.rsi(df["Close"], length=14)
+            if rsi_result is not None:
+                df = df.assign(RSI=rsi_result)
         if "MACD" in selected_indicators:
             macd = ta.macd(df["Close"])
-            df = df.assign(
-                MACD=macd["MACD_12_26_9"].ffill(),  # Updated
-                MACDh=macd["MACDh_12_26_9"].ffill(),  # Updated
-                MACDs=macd["MACDs_12_26_9"].ffill()  # Updated
-            )
+            if macd is not None and not macd.empty:
+                df = df.assign(
+                    MACD=macd.get("MACD_12_26_9", pd.Series()).ffill().infer_objects(copy=False),
+                    MACDh=macd.get("MACDh_12_26_9", pd.Series()).ffill().infer_objects(copy=False),
+                    MACDs=macd.get("MACDs_12_26_9", pd.Series()).ffill().infer_objects(copy=False)
+                )
         
         # Handle missing values with detailed logging
         numeric_columns = df.select_dtypes(include=[np.number]).columns
@@ -196,7 +237,7 @@ def predict_next_day_close(data: pd.DataFrame, fundamentals: dict, selected_indi
                 
                 if col in fundamental_cols:
                     # For fundamental metrics, forward fill and then backfill
-                    df[col] = df[col].ffill().bfill().fillna(0)  # Updated
+                    df[col] = df[col].ffill().bfill().fillna(0).infer_objects(copy=False)  # Updated for pandas future
                     logger.info(f"Filled fundamental metric {col} using forward/backward fill")
                 elif col in ['Returns', 'Log_Returns', 'Volatility']:
                     df[col] = df[col].fillna(0)
@@ -215,7 +256,26 @@ def predict_next_day_close(data: pd.DataFrame, fundamentals: dict, selected_indi
             
         # Prepare features
         feature_cols = [col for col in df.columns if col not in ['Close', 'Target']]
+        
+        # Ensure we have at least some features
+        if len(feature_cols) == 0:
+            logger.error("No feature columns available for prediction")
+            return None, None
+        
         df = df.assign(Target=df['Close'].shift(-1))
+        
+        # Filter out any completely empty feature columns
+        valid_feature_cols = []
+        for col in feature_cols:
+            if col in df.columns and not df[col].isna().all():
+                valid_feature_cols.append(col)
+        
+        if len(valid_feature_cols) == 0:
+            logger.error("No valid feature columns with data")
+            return None, None
+            
+        feature_cols = valid_feature_cols
+        logger.info(f"Using {len(feature_cols)} feature columns for prediction")
         
         # Final validation before model training
         nan_columns = df[feature_cols].columns[df[feature_cols].isna().any()].tolist()
@@ -227,40 +287,88 @@ def predict_next_day_close(data: pd.DataFrame, fundamentals: dict, selected_indi
             logger.error(f"Available columns: {df.columns.tolist()}")
             raise ValueError(f"Data still contains NaN values in columns: {nan_columns}")
         
-        # Prepare training data
+        # Prepare training data with validation
         train_data = df.dropna(subset=['Target'])
+        if len(train_data) < 5:
+            logger.error(f"Insufficient training data after dropping NaN: {len(train_data)} rows")
+            return None, None
+        
         X = train_data[feature_cols]
         y = train_data['Target']
         
-        # Verify we have enough data
-        if len(X) < 10:  # Minimum required samples
-            raise ValueError("Insufficient data for prediction")
+        # Verify we have enough data for training and testing
+        if len(X) < 20:
+            logger.error(f"Insufficient data for prediction: {len(X)} samples. Need at least 20.")
+            return None, None
         
-        split_idx = int(len(X) * 0.8)
+        # Use a smaller split for small datasets
+        if len(X) < 20:
+            split_idx = len(X) - 2  # Keep last 2 for testing
+        else:
+            split_idx = int(len(X) * 0.8)
+            
+        if split_idx <= 0:
+            logger.error("Cannot split data - insufficient samples")
+            return None, None
+            
         X_train, X_test = X.iloc[:split_idx], X.iloc[split_idx:]
         y_train, y_test = y.iloc[:split_idx], y.iloc[split_idx:]
         
-        # Create and train model
-        model = create_model(model_type)
-        model.fit(X_train, y_train)
+        # Ensure we have training data
+        if len(X_train) == 0:
+            logger.error("No training data available after split")
+            return None, None
+        
+        # Create and train model with error handling
+        try:
+            model = create_model(model_type)
+            model.fit(X_train, y_train)
+        except Exception as model_error:
+            logger.error(f"Model training failed: {model_error}")
+            return None, None
         
         # Make prediction
         last_row = X.iloc[[-1]]
         predicted_price = model.predict(last_row)[0]
         
-        # Calculate confidence based on recent prediction accuracy
-        y_pred = model.predict(X_test)
-        confidence = 1.0 - (np.sqrt(mean_squared_error(y_test, y_pred)) / y_test.mean())
+        # Validate prediction result
+        if pd.isna(predicted_price) or predicted_price <= 0:
+            logger.error(f"Invalid predicted price: {predicted_price}")
+            return None, None
         
-        # Log prediction details
+        # Calculate confidence based on recent prediction accuracy
+        if len(X_test) > 0 and len(y_test) > 0:
+            y_pred = model.predict(X_test)
+            mse = mean_squared_error(y_test, y_pred)
+            mean_actual = y_test.mean()
+            if mean_actual > 0:
+                confidence = max(0.0, min(1.0, 1.0 - (np.sqrt(mse) / mean_actual)))
+            else:
+                confidence = 0.5  # Default confidence
+        else:
+            confidence = 0.5  # Default confidence if no test data
+        
+        # Get current price with validation
         current_price = df['Close'].iloc[-1]
-        logger.info("=" * 50)
-        logger.info("Prediction Summary:")
-        logger.info(f"Current Price: ${current_price:.2f}")
-        logger.info(f"Predicted Next Day Close: ${predicted_price:.2f}")
-        logger.info(f"Predicted Change: ${(predicted_price - current_price):.2f} ({((predicted_price/current_price - 1) * 100):.2f}%)")
-        logger.info(f"Model Confidence: {confidence * 100:.2f}%")
-        logger.info("=" * 50)
+        if pd.isna(current_price) or current_price <= 0:
+            logger.error(f"Invalid current price: {current_price}")
+            return None, None
+        
+        # Log prediction details with safe calculations
+        try:
+            price_change = predicted_price - current_price
+            percent_change = (predicted_price / current_price - 1) * 100
+            
+            logger.info("=" * 50)
+            logger.info("Prediction Summary:")
+            logger.info(f"Current Price: ${current_price:.2f}")
+            logger.info(f"Predicted Next Day Close: ${predicted_price:.2f}")
+            logger.info(f"Predicted Change: ${price_change:.2f} ({percent_change:.2f}%)")
+            logger.info(f"Model Confidence: {confidence * 100:.2f}%")
+            logger.info("=" * 50)
+        except Exception as calc_error:
+            logger.warning(f"Error in calculation logging: {calc_error}")
+            logger.info(f"Prediction: ${predicted_price:.2f}, Confidence: {confidence:.2f}")
         
         return float(predicted_price), float(confidence)
         
