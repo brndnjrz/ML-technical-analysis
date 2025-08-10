@@ -8,6 +8,14 @@ import logging
 import inspect
 from typing import Optional, List, Dict, Any, Callable, Union
 
+# Optional pandas_ta import (not required for current implementation)
+try:
+    import pandas_ta as ta
+    HAS_PANDAS_TA = True
+except ImportError:
+    HAS_PANDAS_TA = False
+    logging.warning("pandas_ta not available - using custom indicator calculations")
+
 # Configure logging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -66,7 +74,7 @@ def safe_calculate(df: pd.DataFrame, func: Callable, indicator_name: str) -> Uni
             return pd.DataFrame()
         return pd.Series()
 
-def get_supported_timeframes(data: pd.DataFrame) -> pd.DataFrame:
+def get_supported_timeframes(data: pd.DataFrame) -> Dict[str, pd.DataFrame]:
     """Get OHLCV data resampled to different timeframes.
     
     Args:
@@ -88,20 +96,20 @@ def get_supported_timeframes(data: pd.DataFrame) -> pd.DataFrame:
     try:
         if data.empty:
             logger.error("Input DataFrame is empty")
-            return pd.DataFrame()
+            return {}
             
         # Check required columns
         required = ['Open', 'High', 'Low', 'Close', 'Volume']
         missing = [col for col in required if col not in data.columns]
         if missing:
             logger.error(f"Missing required columns: {missing}")
-            return pd.DataFrame()
+            return {}
             
         # Remove rows with NaN values
         clean_data = data.dropna(subset=required)
         if clean_data.empty:
             logger.error("No valid data after dropping NaN values")
-            return pd.DataFrame()
+            return {}
             
         try:
             # Calculate base metrics for each timeframe
@@ -112,17 +120,128 @@ def get_supported_timeframes(data: pd.DataFrame) -> pd.DataFrame:
             
         except Exception as e:
             logger.error(f"Error calculating timeframe metrics: {str(e)}")
-            return pd.DataFrame()
+            return {}
             
     except Exception as e:
         logger.error(f"Error in data preparation: {str(e)}")
-        return pd.DataFrame()
+        return {}
+
+def log_calculated_indicators(df: pd.DataFrame, timeframe: str):
+    """
+    Log all calculated technical indicators with their latest values
+    
+    Args:
+        df (pd.DataFrame): DataFrame with calculated indicators
+        timeframe (str): Current timeframe being analyzed
+    """
+    try:
+        if df.empty:
+            logger.warning("No data available for indicator logging")
+            return
+            
+        # Get the latest row for current values
+        latest = df.iloc[-1]
+        
+        # Categorize indicators
+        indicator_categories = {
+            '📈 Trend Indicators': {
+                'SMA_20': 'SMA(20)',
+                'SMA_50': 'SMA(50)', 
+                'EMA_20': 'EMA(20)',
+                'EMA_50': 'EMA(50)',
+                'VWAP': 'VWAP',
+                'ADX': 'ADX(14)'
+            },
+            '⚡ Momentum Indicators': {
+                'RSI': 'RSI(14)',
+                'MACD': 'MACD Line',
+                'MACD_Signal': 'MACD Signal'
+            },
+            '📊 Volatility Indicators': {
+                'ATR': 'ATR(14)',
+                'BB_upper': 'BB Upper',
+                'BB_middle': 'BB Middle', 
+                'BB_lower': 'BB Lower',
+                'volatility': 'Historical Vol'
+            },
+            '💰 Volume Indicators': {
+                'OBV': 'On-Balance Volume'
+            },
+            '📉 Market Data': {
+                'returns': 'Daily Returns'
+            }
+        }
+        
+        # Log header
+        logger.info(f"🔧 Technical Indicators Calculated ({timeframe} timeframe):")
+        
+        # Log each category
+        for category, indicators in indicator_categories.items():
+            calculated_indicators = []
+            
+            for col_name, display_name in indicators.items():
+                if col_name in df.columns:
+                    value = latest[col_name]
+                    if pd.notna(value):
+                        # Format value based on indicator type
+                        if col_name in ['RSI', 'ADX']:
+                            calculated_indicators.append(f"{display_name}: {value:.1f}")
+                        elif col_name in ['returns', 'volatility']:
+                            calculated_indicators.append(f"{display_name}: {value*100:.2f}%")
+                        elif col_name == 'OBV':
+                            calculated_indicators.append(f"{display_name}: {value:,.0f}")
+                        else:
+                            calculated_indicators.append(f"{display_name}: ${value:.2f}")
+                    else:
+                        calculated_indicators.append(f"{display_name}: N/A")
+            
+            if calculated_indicators:
+                logger.info(f"   {category}: {' | '.join(calculated_indicators)}")
+        
+        # Log timeframe-specific indicators if they exist
+        timeframe_indicators = []
+        timeframe_cols = [f'RSI_{timeframe}', f'MACD_{timeframe}', f'ADX_{timeframe}', 
+                         f'ATR_{timeframe}', f'OBV_{timeframe}']
+        
+        for col in timeframe_cols:
+            if col in df.columns and pd.notna(latest[col]):
+                base_name = col.replace(f'_{timeframe}', '')
+                value = latest[col]
+                if base_name in ['RSI', 'ADX']:
+                    timeframe_indicators.append(f"{base_name}: {value:.1f}")
+                elif base_name == 'OBV':
+                    timeframe_indicators.append(f"{base_name}: {value:,.0f}")
+                else:
+                    timeframe_indicators.append(f"{base_name}: ${value:.2f}")
+        
+        if timeframe_indicators:
+            logger.info(f"   🕐 {timeframe.upper()} Specific: {' | '.join(timeframe_indicators)}")
+        
+        # Summary statistics
+        total_indicators = len([col for col in df.columns 
+                              if col not in ['Open', 'High', 'Low', 'Close', 'Volume', 'Dividends', 'Stock Splits']])
+        
+        valid_indicators = len([col for col in df.columns 
+                              if col not in ['Open', 'High', 'Low', 'Close', 'Volume', 'Dividends', 'Stock Splits'] 
+                              and pd.notna(latest.get(col))])
+        
+        logger.info(f"✅ Summary: {valid_indicators}/{total_indicators} indicators calculated successfully")
+        
+    except Exception as e:
+        logger.error(f"Error logging indicators: {str(e)}")
 
 def calculate_indicators(data: pd.DataFrame, 
                        timeframe: str = "1d",
                        strategy_type: Optional[str] = None,
                        selected_indicators: Optional[List[str]] = None) -> pd.DataFrame:
     """Calculate technical indicators for market analysis.
+    
+    Calculates indicators to match yfinance column structure:
+    ['Open', 'High', 'Low', 'Close', 'Volume', 'Dividends', 'Stock Splits', 
+     'returns', 'volatility', 'RSI', 'RSI_1d', 'MACD', 'MACD_Signal', 
+     'MACD_1d', 'MACD_Signal_1d', 'ADX', 'ADX_1d', 'OBV', 'OBV_1d', 
+     'ATR', 'ATR_1d', 'EMA_20', 'EMA_50', 'SMA_20', 'SMA_50', 
+     'BB_upper', 'BB_middle', 'BB_lower', 'VWAP']
     
     Args:
         data: DataFrame with OHLCV data
@@ -133,90 +252,144 @@ def calculate_indicators(data: pd.DataFrame,
     Returns:
         DataFrame with calculated indicators
     """
-    
     if not isinstance(data, pd.DataFrame) or data.empty:
         logger.error("Invalid or empty input data")
         return pd.DataFrame()
-    
-    try:
-        # Make a copy of input data
-        df = data.copy()
         
-        # Verify required columns
+    try:
+        df = data.copy()
         required = ['Open', 'High', 'Low', 'Close', 'Volume']
         if not all(col in df.columns for col in required):
             logger.error("Missing required OHLCV columns")
             return pd.DataFrame()
             
-        # Set default indicators if none provided
         if not selected_indicators:
-            selected_indicators = ["RSI", "MACD", "BB", "ADX", "ATR"]
-            
-        # Basic calculations with error handling
+            selected_indicators = ["RSI", "MACD", "BB", "ADX", "ATR", "OBV"]
+
+        # --- Returns & Volatility ---
+        df['returns'] = df['Close'].pct_change()
+        df['returns'] = df['returns'].replace([np.inf, -np.inf], np.nan).fillna(0)
+        df['volatility'] = (df['returns']
+                            .rolling(window=21, min_periods=21)
+                            .std() * np.sqrt(252))
+
+        # --- Moving Averages ---
+        df['SMA_20'] = df['Close'].rolling(window=20, min_periods=20).mean()
+        df['SMA_50'] = df['Close'].rolling(window=50, min_periods=50).mean()
+        df['EMA_20'] = df['Close'].ewm(span=20, adjust=False, min_periods=20).mean()
+        df['EMA_50'] = df['Close'].ewm(span=50, adjust=False, min_periods=50).mean()
+
+        # --- VWAP ---
+        if 'Volume' in df.columns and 'Close' in df.columns:
+            df['VWAP'] = (df['Close'] * df['Volume']).cumsum() / df['Volume'].cumsum()
+
+        # --- Bollinger Bands ---
+        rolling_mean = df['Close'].rolling(window=20, min_periods=20).mean()
+        rolling_std = df['Close'].rolling(window=20, min_periods=20).std()
+        df['BB_upper'] = rolling_mean + (rolling_std * 2)
+        df['BB_middle'] = rolling_mean
+        df['BB_lower'] = rolling_mean - (rolling_std * 2)
+
+        # --- RSI (14) ---
+        delta = df['Close'].diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=14, min_periods=14).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=14, min_periods=14).mean()
+        rs = gain / loss
+        df['RSI'] = 100 - (100 / (1 + rs))
+        
+        # Add timeframe-specific RSI
+        df[f'RSI_{timeframe}'] = df['RSI']
+
+        # --- ATR (14) ---
+        high_low = df['High'] - df['Low']
+        high_close = (df['High'] - df['Close'].shift()).abs()
+        low_close = (df['Low'] - df['Close'].shift()).abs()
+        ranges = pd.concat([high_low, high_close, low_close], axis=1)
+        true_range = ranges.max(axis=1)
+        df['ATR'] = true_range.rolling(window=14, min_periods=14).mean()
+        
+        # Add timeframe-specific ATR
+        df[f'ATR_{timeframe}'] = df['ATR']
+
+        # --- OBV ---
+        df['OBV'] = (df['Volume'] * ((df['Close'] > df['Close'].shift(1)).astype(int) - 
+                                   (df['Close'] < df['Close'].shift(1)).astype(int))).cumsum()
+        
+        # Add timeframe-specific OBV
+        df[f'OBV_{timeframe}'] = df['OBV']
+
+        # --- MACD ---
+        ema12 = df['Close'].ewm(span=12, adjust=False, min_periods=12).mean()
+        ema26 = df['Close'].ewm(span=26, adjust=False, min_periods=26).mean()
+        df['MACD'] = ema12 - ema26
+        df['MACD_Signal'] = df['MACD'].ewm(span=9, adjust=False, min_periods=9).mean()
+        
+        # Add timeframe-specific MACD
+        df[f'MACD_{timeframe}'] = df['MACD']
+        df[f'MACD_Signal_{timeframe}'] = df['MACD_Signal']
+
+        # --- ADX (14) ---
         try:
-            # Calculate returns
-            df['returns'] = df['Close'].pct_change()
-            df['returns'] = df['returns'].replace([np.inf, -np.inf], np.nan).fillna(0)
+            # Calculate +DI and -DI
+            high_diff = df['High'].diff()
+            low_diff = df['Low'].diff()
             
-            # Calculate volatility
-            df['volatility'] = (df['returns']
-                              .rolling(window=21)
-                              .std()
-                              .replace([np.inf, -np.inf], np.nan)
-                              .ffill()
-                              .fillna(0) * np.sqrt(252))
-                              
-            # RSI
-            df['RSI'] = ta.rsi(df['Close'], length=14).fillna(50)
-            df[f'RSI_{timeframe}'] = df['RSI']
+            plus_dm = np.where((high_diff > low_diff) & (high_diff > 0), high_diff, 0)
+            minus_dm = np.where((low_diff > high_diff) & (low_diff > 0), low_diff, 0)
             
-            # MACD
-            macd = ta.macd(df['Close'])
-            df['MACD'] = macd['MACD_12_26_9'].fillna(0)
-            df['MACD_Signal'] = macd['MACDs_12_26_9'].fillna(0)
-            df[f'MACD_{timeframe}'] = df['MACD']
-            df[f'MACD_Signal_{timeframe}'] = df['MACD_Signal']
+            plus_dm_series = pd.Series(plus_dm, index=df.index)
+            minus_dm_series = pd.Series(minus_dm, index=df.index)
             
-            # ADX
-            df['ADX'] = ta.adx(df['High'], df['Low'], df['Close'])['ADX_14'].fillna(20)
-            df[f'ADX_{timeframe}'] = df['ADX']
+            tr = true_range  # Already calculated above
             
-            # OBV
-            df['OBV'] = ta.obv(df['Close'], df['Volume']).fillna(0)
-            df[f'OBV_{timeframe}'] = df['OBV']
+            # 14-period smoothed averages
+            plus_di = 100 * (plus_dm_series.rolling(window=14, min_periods=14).mean() / 
+                            tr.rolling(window=14, min_periods=14).mean())
+            minus_di = 100 * (minus_dm_series.rolling(window=14, min_periods=14).mean() / 
+                             tr.rolling(window=14, min_periods=14).mean())
             
-            # ATR
-            df['ATR'] = ta.atr(df['High'], df['Low'], df['Close']).fillna(0)
-            df[f'ATR_{timeframe}'] = df['ATR']
+            # Calculate DX
+            dx = 100 * (abs(plus_di - minus_di) / (plus_di + minus_di))
             
-            # Clean up any remaining NaN values
-            df = df.ffill().bfill().fillna(0)
-
-            # --- Ensure all required columns exist, even if not calculated ---
-            required_cols = [
-                'EMA_20', 'EMA_50', 'OBV', 'ATR', 'SMA_20', 'SMA_50', 'RSI', 'MACD', 'MACD_Signal', 'ADX',
-                'BB_upper', 'BB_middle', 'BB_lower', 'VWAP', 'Volume'
-            ]
-            for col in required_cols:
-                if col not in df.columns:
-                    if col == 'Volume' and 'Volume' in data.columns:
-                        df[col] = data['Volume']
-                    else:
-                        df[col] = 0
-
-            return df
+            # Calculate ADX as 14-period smoothed average of DX
+            df['ADX'] = dx.rolling(window=14, min_periods=14).mean()
             
         except Exception as e:
-            logger.error(f"Error calculating indicators: {str(e)}")
-            return data  # Return original data if calculation fails
+            logger.error(f"Error calculating ADX: {str(e)}")
+            df['ADX'] = np.nan
             
+        # Add timeframe-specific ADX
+        df[f'ADX_{timeframe}'] = df['ADX']
+
+        # Ensure all required columns exist for downstream code
+        required_cols = [
+            'EMA_20', 'EMA_50', 'OBV', 'ATR', 'SMA_20', 'SMA_50', 'RSI', 'MACD', 'MACD_Signal', 'ADX',
+            'BB_upper', 'BB_middle', 'BB_lower', 'VWAP', 'Volume', 'returns', 'volatility',
+            f'RSI_{timeframe}', f'MACD_{timeframe}', f'MACD_Signal_{timeframe}', 
+            f'ADX_{timeframe}', f'OBV_{timeframe}', f'ATR_{timeframe}'
+        ]
+        
+        for col in required_cols:
+            if col not in df.columns:
+                if col == 'Volume' and 'Volume' in data.columns:
+                    df[col] = data['Volume']
+                else:
+                    df[col] = np.nan
+
+        # Log all calculated indicators with their latest values
+        log_calculated_indicators(df, timeframe)
+        
+        return df
+
     except Exception as e:
         logger.error(f"Error in indicator calculation setup: {str(e)}")
         return pd.DataFrame()
+
 # =========================
 # Support & Resistance Detection
 # =========================
-def detect_support_resistance(data, method="quick", window=20, tolerance=0.01):
+def detect_support_resistance(data: pd.DataFrame, method: str = "quick", 
+                             window: int = 20, tolerance: float = 0.01) -> Dict[str, List[float]]:
     """
     Detect support and resistance zones using local minima and maxima in price history.
 
@@ -231,13 +404,14 @@ def detect_support_resistance(data, method="quick", window=20, tolerance=0.01):
     """
     if not isinstance(data, pd.DataFrame):
         raise TypeError(f"Expected pandas DataFrame, got {type(data)}")
+        
     df = data.copy()
     supports = []
     resistances = []
 
     window = max(window, 30) if method == "advanced" else max(window, 10)
     if len(df) < window * 2:
-        print(f"[Warning] Not enough data for support/resistance detection. Need at least {window*2} candles, got {len(df)}")
+        logger.warning(f"Not enough data for support/resistance detection. Need at least {window*2} candles, got {len(df)}")
         return {"support": [], "resistance": []}
 
     for i in range(window, len(df) - window):
@@ -246,6 +420,7 @@ def detect_support_resistance(data, method="quick", window=20, tolerance=0.01):
             level = df['Low'].iloc[i]
             if not any(abs(level - s) / s < tolerance for s in supports):
                 supports.append(level)
+                
         local_highs = df['High'].iloc[i - window:i + window]
         if df['High'].iloc[i] == local_highs.max():
             level = df['High'].iloc[i]
@@ -262,340 +437,34 @@ def detect_support_resistance(data, method="quick", window=20, tolerance=0.01):
 # =========================
 # IV Metrics Calculation
 # =========================
-def calculate_iv_metrics(ticker, data):
+def calculate_iv_metrics(ticker: str, data: pd.DataFrame) -> Dict[str, float]:
     """
     Calculate implied volatility metrics from historical data.
-    """
-    try:
-        if 'volatility' not in data.columns:
-            data['returns'] = data['Close'].pct_change()
-            data['volatility'] = data['returns'].rolling(window=21).std() * (252 ** 0.5)
-        current_iv = data['volatility'].iloc[-1] * 100
-        iv_series = data['volatility'].dropna()
-        iv_rank = (iv_series.rank(pct=True).iloc[-1]) * 100
-        return {
-            'iv_rank': iv_rank,
-            'iv_percentile': iv_rank,
-            'hv_30': current_iv,
-            'vix': 20.0  # Placeholder
-        }
-    except Exception as e:
-        print(f"[Warning] Could not calculate IV metrics: {e}")
-        return {
-            'iv_rank': 0,
-            'iv_percentile': 0,
-            'hv_30': 0,
-            'vix': 20.0
-        }
-
-# =========================
-# Options Flow (Placeholder)
-# =========================
-def get_options_flow(ticker):
-    """
-    Get options flow data (placeholder).
-    """
-    # print(f"[Info] Options flow data not available for {ticker}")
-    logging.info(f"Options flow data not available for {ticker}")
-    return None
-    # Default indicators if none selected
-    if selected_indicators is None:
-        selected_indicators = ["RSI", "MACD", "SMA", "EMA", "VWAP", "Bollinger Bands", "ADX", "Stochastic", "OBV", "ATR"]
-    selected_str = str(selected_indicators).lower()
-
-    try:
-        # Implied Volatility (IV) with safety checks
-        data['returns'] = data['Close'].pct_change()
-        data['returns'] = data['returns'].replace([np.inf, -np.inf], np.nan).fillna(0)
-        
-        volatility = data['returns'].rolling(window=21).std()
-        volatility = volatility.replace([np.inf, -np.inf], np.nan)
-        data['volatility'] = (volatility.fillna(method='ffill')
-                            .fillna(method='bfill')
-                            .fillna(0) * (252 ** 0.5))
-    except Exception as e:
-        logger.error(f"Error calculating volatility: {str(e)}")
-        data['returns'] = 0
-        data['volatility'] = 0
-        
-    try:
-        # RSI
-        if any(indicator.lower() in selected_str for indicator in ['rsi']):
-            data['RSI_14'] = ta.rsi(data['Close'], length=14).ffill().fillna(50)
-            data['RSI_21'] = ta.rsi(data['Close'], length=21).ffill().fillna(50)
-            data[f'RSI_{timeframe}'] = data['RSI_14']
-            data['RSI'] = data['RSI_14']  # Default RSI
-    except Exception as e:
-        logger.error(f"Error calculating RSI: {str(e)}")
-        data['RSI_14'] = 50
-        data['RSI_21'] = 50
-        data[f'RSI_{timeframe}'] = 50
-        data['RSI'] = 50
-    for col in ['RSI_14', 'RSI_21', f'RSI_{timeframe}', 'RSI']:
-        data[col] = data[col].ffill().fillna(50)
-
-    # MACD
-    try:
-        macd = ta.macd(data['Close'])
-        data['MACD'] = macd['MACD_12_26_9'].ffill().fillna(0)
-        data['MACD_Signal'] = macd['MACDs_12_26_9'].ffill().fillna(0)
-        data['MACD_Hist'] = macd['MACDh_12_26_9'].ffill().fillna(0)
-        
-        # Store timeframe specific versions
-        data[f'MACD_{timeframe}'] = data['MACD']
-        data[f'MACD_Signal_{timeframe}'] = data['MACD_Signal']
-        data[f'MACD_Hist_{timeframe}'] = data['MACD_Hist']
-        # Store additional formats that might be needed
-        data['MACD_Line'] = data['MACD']
-        data['Signal_Line'] = data['MACD_Signal']
-        data['MACD_Histogram'] = data['MACD_Hist']
-    except Exception as e:
-        logger.error(f"Error calculating MACD: {str(e)}")
-        for col in ['MACD', 'MACD_Signal', 'MACD_Hist', 
-                   f'MACD_{timeframe}', f'MACD_Signal_{timeframe}', f'MACD_Hist_{timeframe}',
-                   'MACD_Line', 'Signal_Line', 'MACD_Histogram']:
-            data[col] = 0
     
-    macd_cols = ['MACD', 'MACD_Signal', 'MACD_Hist', 
-                 f'MACD_{timeframe}', f'MACD_Signal_{timeframe}', f'MACD_Hist_{timeframe}',
-                 'MACD_Line', 'Signal_Line', 'MACD_Histogram']
-    for col in macd_cols:
-        if col in data.columns:
-            data[col] = data[col].ffill().fillna(0)
-
-    # SMA
-    try:
-        data['SMA_20'] = data['Close'].rolling(window=20).mean().ffill()
-        data['SMA_50'] = data['Close'].rolling(window=50).mean().ffill()
-        
-        # Store timeframe specific versions
-        data[f'SMA_20_{timeframe}'] = data['SMA_20']
-        data[f'SMA_50_{timeframe}'] = data['SMA_50']
-        # Add raw SMA columns without timeframe suffix
-        data['SMA20'] = data['SMA_20']
-        data['SMA50'] = data['SMA_50']
-    except Exception as e:
-        logger.error(f"Error calculating SMA: {str(e)}")
-        for col in ['SMA_20', 'SMA_50', f'SMA_20_{timeframe}', f'SMA_50_{timeframe}', 'SMA20', 'SMA50']:
-            data[col] = data['Close']
-    
-    sma_cols = ['SMA_20', 'SMA_50', f'SMA_20_{timeframe}', f'SMA_50_{timeframe}', 'SMA20', 'SMA50']
-    for col in sma_cols:
-        data[col] = data[col].ffill().fillna(data['Close'])
-
-    # EMA
-    try:
-        data['EMA_20'] = data['Close'].ewm(span=20, adjust=False).mean().ffill()
-        data['EMA_50'] = data['Close'].ewm(span=50, adjust=False).mean().ffill()
-        
-        # Store timeframe specific versions
-        data[f'EMA_20_{timeframe}'] = data['EMA_20']
-        data[f'EMA_50_{timeframe}'] = data['EMA_50']
-        
-        ema_cols = ['EMA_20', 'EMA_50', f'EMA_20_{timeframe}', f'EMA_50_{timeframe}']
-        for col in ema_cols:
-            data[col] = data[col].ffill().fillna(data['Close'])
-    except Exception as e:
-        logger.error(f"Error calculating EMA: {str(e)}")
-        for col in ['EMA_20', 'EMA_50', f'EMA_20_{timeframe}', f'EMA_50_{timeframe}']:
-            data[col] = data['Close']
-
-    # VWAP
-    try:
-        data['VWAP'] = (data['Close'] * data['Volume']).cumsum() / data["Volume"].cumsum()
-        data['VWAP'] = data['VWAP'].ffill().fillna(data['Close'])
-        data[f'VWAP_{timeframe}'] = data['VWAP']
-    except Exception as e:
-        logger.warning(f"Error calculating VWAP: {str(e)}")
-        data['VWAP'] = data['Close']
-        data[f'VWAP_{timeframe}'] = data['Close']
-
-    # Bollinger Bands
-    try:
-        bb = ta.bbands(data['Close'], length=20, std=2)
-        data[f'BB_middle_{timeframe}'] = bb['BBM_20_2.0'].ffill().fillna(data['Close'])
-        std = data['Close'].rolling(window=20).std().ffill().fillna(data['Close'].std())
-        
-        data[f'BB_upper_{timeframe}'] = bb['BBU_20_2.0'].fillna(data[f'BB_middle_{timeframe}'] + 2 * std)
-        data[f'BB_lower_{timeframe}'] = bb['BBL_20_2.0'].fillna(data[f'BB_middle_{timeframe}'] - 2 * std)
-        
-        # Store standard versions without timeframe
-        data['BB_upper'] = data[f'BB_upper_{timeframe}']
-        data['BB_lower'] = data[f'BB_lower_{timeframe}']
-        data['BB_middle'] = data[f'BB_middle_{timeframe}']
-    except Exception as e:
-        logger.error(f"Error calculating Bollinger Bands: {str(e)}")
-        data[f'BB_middle_{timeframe}'] = data['Close']
-        data[f'BB_upper_{timeframe}'] = data['Close']
-        data[f'BB_lower_{timeframe}'] = data['Close']
-        data['BB_upper'] = data['Close']
-        data['BB_lower'] = data['Close']
-        data['BB_middle'] = data['Close']
-    
-    bb_cols = ['BB_upper', 'BB_lower', 'BB_middle',
-               f'BB_upper_{timeframe}', f'BB_lower_{timeframe}', f'BB_middle_{timeframe}']
-    for col in bb_cols:
-        data[col] = data[col].ffill()
-
-    # ADX
-    try:
-        adx_result = ta.adx(data['High'], data['Low'], data['Close'])
-        data['ADX'] = adx_result['ADX_14'].ffill().fillna(25)
-        data[f'ADX_{timeframe}'] = data['ADX']
-        
-        for col in ['ADX', f'ADX_{timeframe}']:
-            data[col] = data[col].ffill().fillna(25)
-    except Exception as e:
-        logger.error(f"Error calculating ADX: {str(e)}")
-        for col in ['ADX', f'ADX_{timeframe}']:
-            data[col] = 25
-
-    # Stochastic
-    try:
-        if any(indicator.lower() in selected_str for indicator in ['stoch']):
-            stoch = ta.stoch(data['High'], data['Low'], data['Close'])
-            data[f'STOCH_%K_{timeframe}'] = stoch['STOCHk_14_3_3']
-    except Exception as e:
-        logger.error(f"Error calculating Stochastic: {str(e)}")
-        data[f'STOCH_%K_{timeframe}'] = 50
-        data[f'STOCH_%D_{timeframe}'] = stoch['STOCHd_14_3_3']
-
-    # OBV
-    try:
-        if any(indicator.lower() in selected_str for indicator in ['obv']):
-            data['OBV'] = ta.obv(data['Close'], data['Volume'])
-            data[f'OBV_{timeframe}'] = data['OBV']
-    except Exception as e:
-        logger.error(f"Error calculating OBV: {str(e)}")
-        data['OBV'] = 0
-        data[f'OBV_{timeframe}'] = 0
-
-    # ATR (always calculate)
-    try:
-        atr = ta.atr(data['High'], data['Low'], data['Close'])
-        initial_atr = (data['High'].iloc[0] - data['Low'].iloc[0]) if not atr.empty else 0
-        data['ATR'] = atr.ffill().fillna(initial_atr)
-        data[f'ATR_{timeframe}'] = data['ATR']
-        
-        for col in ['ATR', f'ATR_{timeframe}']:
-            if col in data.columns:
-                data[col] = data[col].ffill().fillna(initial_atr)
-    except Exception as e:
-        logger.error(f"Error calculating ATR: {str(e)}")
-        initial_atr = data['High'].iloc[0] - data['Low'].iloc[0]
-        for col in ['ATR', f'ATR_{timeframe}']:
-            data[col] = initial_atr
-
-    # Verify indicator calculations
-    print("\nIndicator Calculation Summary:")
-    latest_data = data.iloc[-1]
-    
-    # Group indicators for better readability
-    indicator_groups = {
-        'Momentum Indicators': ['RSI_21', 'RSI_14', 'RSI', 'MACD', 'MACD_Signal', 'MACD_Hist'],
-        'Moving Averages': ['SMA_20', 'SMA_50', 'EMA_20', 'EMA_50'],
-        'Trend Indicators': ['ADX', 'VWAP'],
-        'Volatility Indicators': ['ATR', 'BB_upper_' + timeframe, 'BB_lower_' + timeframe]
-    }
-    
-    print("\n=== Technical Indicator Values ===")
-    for group_name, indicators in indicator_groups.items():
-        print(f"\n{group_name}:")
-        for indicator in indicators:
-            if indicator in data.columns:
-                try:
-                    value = latest_data[indicator]
-                    if pd.isna(value):
-                        print(f"  {indicator}: N/A (NaN value)")
-                    else:
-                        print(f"  {indicator}: {value:.4f}")
-                except Exception as e:
-                    print(f"  {indicator}: Error calculating ({str(e)})")
-            else:
-                print(f"  {indicator}: Not calculated")
-    
-    # Verify data quality
-    null_columns = data.columns[data.isnull().any()].tolist()
-    if null_columns:
-        print("\nWarning: Found null values in columns:")
-        for col in null_columns:
-            null_count = data[col].isnull().sum()
-            print(f"  {col}: {null_count} null values")
-    
-    # Print all available columns for debugging
-    print("\nAvailable Columns:")
-    print(", ".join(sorted(data.columns)))
-    
-    return data
-
-# =========================
-# Support & Resistance Detection
-# =========================
-def detect_support_resistance(data, method="quick", window=20, tolerance=0.01):
-    """
-    Detect support and resistance zones using local minima and maxima in price history.
-
     Args:
-        data (pd.DataFrame): Stock price data
-        method (str): Method to use ("quick" or "advanced")
-        window (int): Window size for detecting levels
-        tolerance (float): Tolerance for grouping similar levels
-
+        ticker (str): Stock ticker symbol
+        data (pd.DataFrame): DataFrame with price data
+        
     Returns:
-        dict: {'support': [...], 'resistance': [...]}
-    """
-    if not isinstance(data, pd.DataFrame):
-        raise TypeError(f"Expected pandas DataFrame, got {type(data)}")
-    df = data.copy()
-    supports = []
-    resistances = []
-
-    window = max(window, 30) if method == "advanced" else max(window, 10)
-    if len(df) < window * 2:
-        print(f"[Warning] Not enough data for support/resistance detection. Need at least {window*2} candles, got {len(df)}")
-        return {"support": [], "resistance": []}
-
-    for i in range(window, len(df) - window):
-        local_lows = df['Low'].iloc[i - window:i + window]
-        if df['Low'].iloc[i] == local_lows.min():
-            level = df['Low'].iloc[i]
-            if not any(abs(level - s) / s < tolerance for s in supports):
-                supports.append(level)
-        local_highs = df['High'].iloc[i - window:i + window]
-        if df['High'].iloc[i] == local_highs.max():
-            level = df['High'].iloc[i]
-            if not any(abs(level - r) / r < tolerance for r in resistances):
-                resistances.append(level)
-
-    supports = sorted(supports)
-    resistances = sorted(resistances)
-    return {
-        "support": supports[-3:] if supports else [],
-        "resistance": resistances[-3:] if resistances else []
-    }
-
-# =========================
-# IV Metrics Calculation
-# =========================
-def calculate_iv_metrics(ticker, data):
-    """
-    Calculate implied volatility metrics from historical data.
+        dict: Dictionary containing IV metrics
     """
     try:
         if 'volatility' not in data.columns:
             data['returns'] = data['Close'].pct_change()
             data['volatility'] = data['returns'].rolling(window=21).std() * (252 ** 0.5)
+            
         current_iv = data['volatility'].iloc[-1] * 100
         iv_series = data['volatility'].dropna()
         iv_rank = (iv_series.rank(pct=True).iloc[-1]) * 100
+        
         return {
             'iv_rank': iv_rank,
             'iv_percentile': iv_rank,
             'hv_30': current_iv,
-            'vix': 20.0  # Placeholder
+            'vix': 20.0  # Placeholder - would need VIX data from external source
         }
     except Exception as e:
-        print(f"[Warning] Could not calculate IV metrics: {e}")
+        logger.warning(f"Could not calculate IV metrics for {ticker}: {e}")
         return {
             'iv_rank': 0,
             'iv_percentile': 0,
@@ -606,9 +475,15 @@ def calculate_iv_metrics(ticker, data):
 # =========================
 # Options Flow (Placeholder)
 # =========================
-def get_options_flow(ticker):
+def get_options_flow(ticker: str) -> Optional[Dict[str, Any]]:
     """
     Get options flow data (placeholder).
+    
+    Args:
+        ticker (str): Stock ticker symbol
+        
+    Returns:
+        Optional[Dict[str, Any]]: Options flow data or None
     """
-    print(f"[Info] Options flow data not available for {ticker}")
+    logging.debug(f"⚠️ Options flow data not implemented for {ticker}")  # Changed to debug level
     return None

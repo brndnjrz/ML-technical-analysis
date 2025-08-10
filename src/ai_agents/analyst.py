@@ -1,6 +1,10 @@
 import pandas as pd
 import numpy as np
 from typing import Dict, Any, List
+import logging
+
+# Setup logger
+logger = logging.getLogger(__name__)
 
 class AnalystAgent:
     """
@@ -12,7 +16,7 @@ class AnalystAgent:
         self.config = config or {}
     
     def analyze_technical_indicators(self, data: pd.DataFrame) -> Dict[str, Any]:
-        print("[AnalystAgent] Analyzing technical indicators")
+        logger.debug("📈 Analyzing technical indicators")
         """Analyze technical indicators and identify significant patterns."""
         analysis = {}
         try:
@@ -37,7 +41,7 @@ class AnalystAgent:
         return analysis
     
     def analyze_fundamental_data(self, ticker: str, fundamental_data: Dict[str, Any]) -> Dict[str, Any]:
-        print("[AnalystAgent] Analyzing fundamental data")
+        logger.debug("📊 Analyzing fundamental data")
         """Analyze fundamental data and provide insights."""
         analysis = {}
         try:

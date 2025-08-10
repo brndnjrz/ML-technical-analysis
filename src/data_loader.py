@@ -8,6 +8,41 @@ import pandas as pd
 import logging 
 
 # =========================
+# Logging Helper
+# =========================
+def log_data_info(ticker: str, message_type: str, **kwargs):
+    """Centralized logging for data operations"""
+    if message_type == "fundamentals":
+        fundamentals = kwargs.get('fundamentals', {})
+        fundamental_summary = []
+        for key, value in fundamentals.items():
+            if value is not None and value != 'N/A':
+                if key in ['Revenue Growth', 'Profit Margin', 'Dividend Yield']:
+                    fundamental_summary.append(f"{key}: {value:.1f}%")
+                elif key in ['P/E Ratio', 'Forward P/E', 'PEG Ratio', 'Beta']:
+                    fundamental_summary.append(f"{key}: {value:.2f}")
+                elif key == 'Market Cap':
+                    fundamental_summary.append(f"{key}: ${value/1e9:.1f}B")
+                elif key in ['Volume', 'Average Volume']:
+                    fundamental_summary.append(f"{key}: {value:,}")
+                else:
+                    fundamental_summary.append(f"{key}: {value}")
+        
+        if fundamental_summary:
+            logging.info(f"📊 {ticker} | {' | '.join(fundamental_summary[:3])}")
+        else:
+            logging.info(f"📊 {ticker} | No fundamental data available")
+            
+    elif message_type == "data_fetched":
+        rows = kwargs.get('rows', 0)
+        interval = kwargs.get('interval', 'unknown')
+        logging.info(f"✅ {ticker} | Fetched {rows} {interval} candles")
+        
+    elif message_type == "error":
+        error = kwargs.get('error', 'Unknown error')
+        logging.error(f"❌ {ticker} | {error}") 
+
+# =========================
 # Constants
 # =========================
 VALID_INTRADAY_INTERVALS = ["1m", "2m", "5m", "15m", "30m", "60m", "90m", "1h"]
@@ -98,8 +133,7 @@ def fetch_stock_data(ticker, start_date=None, end_date=None, interval="1d"):
 
         # Fetch fundamental data
         fundamentals = get_fundamental_data(ticker)
-        # print(f"[Info] Fundamental data: {fundamentals}")
-        logging.info(f"Fundamental data for {ticker}: {fundamentals}")
+        log_data_info(ticker, "fundamentals", fundamentals=fundamentals)
 
         # Fetch data based on interval
         if interval in VALID_INTRADAY_INTERVALS:
@@ -146,12 +180,12 @@ def fetch_stock_data(ticker, start_date=None, end_date=None, interval="1d"):
 
         # print(f"[Success] Fetched {len(df)} rows for {ticker}")
         # print(f"[Success] Final columns: {df.columns.tolist()}")
-        logging.info(f"Fetched {len(df)} rows for {ticker}")
-        logging.info(f"Final columns: {df.columns.tolist()}")
+        log_data_info(ticker, "data_fetched", rows=len(df), interval=interval)
+        logging.debug(f"📋 Columns: {', '.join(df.columns.tolist())}")
         return df
 
     except Exception as e:
-        print(f"[Error] Failed to fetch data for {ticker}: {e}")
+        log_data_info(ticker, "error", error=f"Failed to fetch data: {e}")
         import traceback
         traceback.print_exc()
         return None

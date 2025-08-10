@@ -8,16 +8,36 @@ from src.prediction import get_fundamental_metrics, predict_next_day_close
 from src.pdf_utils import generate_and_display_pdf
 from src.ui_components import render_sidebar_quick_stats, sidebar_config, sidebar_indicator_selection
 from src.trading_strategies import strategies_data  # Add this import at the top
+from src.logging_config import setup_logging, set_log_level
+from src.temp_manager import temp_manager, cleanup_old_temp_files
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-    )
+# Setup cleaner logging for Streamlit
+setup_logging(level=logging.INFO, enable_file_logging=False)
+
+# Suppress verbose libraries
+logging.getLogger('kaleido').setLevel(logging.ERROR)
+logging.getLogger('urllib3').setLevel(logging.WARNING)
+logging.getLogger('requests').setLevel(logging.WARNING)
+
+# Clean up old temp files on startup
+cleanup_old_temp_files()
 
 # Set Up Streamlit App UI 
 st.set_page_config(page_title="AI Technical Analysis", layout="wide")
 st.title("Technical Stock Analysis Dashboard")
 st.sidebar.header("⚙️ Configuration")
+
+# --- Logging Level Selector ---
+with st.sidebar.expander("🔧 Debug Settings"):
+    log_level = st.selectbox(
+        "Log Level",
+        ["INFO", "DEBUG", "WARNING", "ERROR"],
+        index=0,
+        help="Control console message verbosity"
+    )
+    if st.button("Apply Log Level"):
+        set_log_level(log_level)
+        st.success(f"Log level set to {log_level}")
 
 # --- Model Selection Widget ---
 model_type = st.sidebar.selectbox(
@@ -36,20 +56,47 @@ active_indicators = sidebar_indicator_selection(strategy_type, interval)
 # Fetch Data Button with Enhanced Logic
 # This button fetches data based on user inputs and updates the session state
 if st.sidebar.button("🔄 Fetch & Analyze Data", type="primary"):
-    with st.spinner("Fetching market data..."):
+    progress_bar = st.sidebar.progress(0)
+    status_text = st.sidebar.empty()
+    
+    try:
+        status_text.text("📈 Fetching market data...")
+        progress_bar.progress(25)
+        
         data, levels, options_data = fetch_and_process_data(
             ticker, start_date, end_date, interval, strategy_type, analysis_type, 
             active_indicators
         )
+        progress_bar.progress(75)
         
         if data is not None:
+            status_text.text("🔧 Calculating indicators...")
             st.session_state["stock_data"] = data
             st.session_state["levels"] = levels
             st.session_state["options_data"] = options_data
             st.session_state["active_indicators"] = active_indicators
-            st.success(f"✅ Data loaded successfully! ({len(data)} candles)")
+            
+            progress_bar.progress(100)
+            status_text.text("✅ Analysis complete!")
+            
+            # Show summary in sidebar
+            st.sidebar.success(f"✅ Loaded {len(data)} {interval} candles for {ticker}")
+            
+            # Clear progress after 2 seconds
+            import time
+            time.sleep(1)
+            progress_bar.empty()
+            status_text.empty()
         else:
-            st.error("❌ Failed to fetch data. Please check ticker symbol and date range.")
+            progress_bar.empty()
+            status_text.empty()
+            st.sidebar.error("❌ Failed to fetch data. Check ticker symbol and date range.")
+            
+    except Exception as e:
+        progress_bar.empty()
+        status_text.empty()
+        st.sidebar.error(f"❌ Error: {str(e)}")
+        logging.error(f"Data fetch error: {str(e)}")
 
 # --- MAIN ANALYSIS SECTION ---
 # This section displays the stock data, technical indicators, and analysis results
@@ -104,6 +151,40 @@ if "stock_data" in st.session_state:
     # Enhanced Chart with Strategy-Specific Indicators
     st.markdown("### 📈 Technical Analysis Chart")
 
+    # Optional: Show current indicator values in expandable section
+    with st.expander("📊 Current Indicator Values", expanded=False):
+        col1, col2, col3 = st.columns(3)
+        
+        latest = data.iloc[-1]
+        
+        with col1:
+            st.markdown("**Trend Indicators**")
+            if 'SMA_20' in data.columns and pd.notna(latest['SMA_20']):
+                st.metric("SMA(20)", f"${latest['SMA_20']:.2f}")
+            if 'EMA_20' in data.columns and pd.notna(latest['EMA_20']):
+                st.metric("EMA(20)", f"${latest['EMA_20']:.2f}")
+            if 'VWAP' in data.columns and pd.notna(latest['VWAP']):
+                st.metric("VWAP", f"${latest['VWAP']:.2f}")
+        
+        with col2:
+            st.markdown("**Momentum Indicators**")
+            if 'RSI' in data.columns and pd.notna(latest['RSI']):
+                rsi_color = "🔴" if latest['RSI'] > 70 else "🟢" if latest['RSI'] < 30 else "🟡"
+                st.metric("RSI(14)", f"{latest['RSI']:.1f} {rsi_color}")
+            if 'MACD' in data.columns and pd.notna(latest['MACD']):
+                st.metric("MACD", f"{latest['MACD']:.4f}")
+            if 'ADX' in data.columns and pd.notna(latest['ADX']):
+                st.metric("ADX(14)", f"{latest['ADX']:.1f}")
+        
+        with col3:
+            st.markdown("**Volatility & Volume**")
+            if 'ATR' in data.columns and pd.notna(latest['ATR']):
+                st.metric("ATR(14)", f"${latest['ATR']:.2f}")
+            if 'OBV' in data.columns and pd.notna(latest['OBV']):
+                st.metric("OBV", f"{latest['OBV']:,.0f}")
+            if 'volatility' in data.columns and pd.notna(latest['volatility']):
+                st.metric("Historical Vol", f"{latest['volatility']*100:.1f}%")
+
     fig = plotter.create_enhanced_chart(
         data=data,
         indicators=st.session_state["active_indicators"],
@@ -116,7 +197,13 @@ if "stock_data" in st.session_state:
     # Print available columns to the console for debugging
     # print("Available columns:", list(data.columns))
     # ...existing code...
-    logging.info("Available columns: %s", list(data.columns))
+    
+    # Log indicator summary 
+    base_columns = ['Open', 'High', 'Low', 'Close', 'Volume', 'Dividends', 'Stock Splits']
+    indicator_columns = [col for col in data.columns if col not in base_columns]
+    
+    logging.info(f"📊 Dashboard loaded: {len(indicator_columns)} technical indicators calculated")
+    logging.debug(f"🔍 Indicator list: {', '.join(sorted(indicator_columns))}")
 
 
     st.plotly_chart(fig, use_container_width=True, height=800)
@@ -257,18 +344,30 @@ if "stock_data" in st.session_state:
     # Run AI analysis synchronously (for simplicity)
 
     if run_analysis:
-        with st.spinner("AI is analyzing the market..."):
-            # Get the price prediction with selected model
-            prediction_result = predict_next_day_close(
-                data.copy(),
-                fundamentals,
-                st.session_state["active_indicators"],
-                model_type=model_type
-            )
+        # Create progress indicators
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        
+        with st.spinner("🤖 AI is analyzing the market..."):
+            print("\n" + "="*60)
+            print("🤖 STARTING AI MARKET ANALYSIS")
+            print("="*60)
             
-            if prediction_result and isinstance(prediction_result, tuple):
-                predicted_price, confidence = prediction_result
-                if predicted_price is not None:
+            # Step 1: Price Prediction (20%)
+            status_text.text("🔮 Generating price predictions...")
+            progress_bar.progress(20)
+            
+            # Get the price prediction with selected model
+            try:
+                prediction_result = predict_next_day_close(
+                    data.copy(),
+                    fundamentals,
+                    st.session_state["active_indicators"],
+                    model_type=model_type
+                )
+                
+                if prediction_result and isinstance(prediction_result, tuple) and prediction_result[0] is not None:
+                    predicted_price, confidence = prediction_result
                     # Create a new column filled with the predicted price
                     data['Predicted_Close'] = float(predicted_price)
                     price_change = predicted_price - data['Close'].iloc[-1]
@@ -279,18 +378,46 @@ if "stock_data" in st.session_state:
                     # Update the prompt with prediction info
                     prediction_context = f"""PREDICTED NEXT DAY CLOSE: ${predicted_price:.2f} (Confidence: {confidence:.1%})
 PRICE CHANGE: ${price_change:.2f} ({(price_change/data['Close'].iloc[-1]*100):.1f}%)"""
+                    print(f"✅ Price prediction: ${predicted_price:.2f} (Confidence: {confidence:.1%})")
+                else:
+                    print("⚠️ AI price prediction temporarily unavailable (insufficient data)")
+                    data_size = len(data)
+                    print(f"📊 Current dataset: {data_size} rows (minimum 20 recommended)")
+                    prediction_context = f"AI PRICE PREDICTION: Unavailable due to small dataset ({data_size} rows). Consider using a longer date range."
+            except Exception as e:
+                print(f"⚠️ Prediction error: {str(e)}")
+                prediction_context = "AI PRICE PREDICTION: Temporarily unavailable"
 
-                    if "Short-Term" in strategy_type:
-                        prompt = prompt.replace("PROVIDE:", f"{prediction_context}\nCONSIDER HOW THIS PRICE AFFECTS SHORT-TERM INDICATORS AND MOMENTUM.\n\nPROVIDE:")
-                    else:
-                        prompt = prompt.replace("PROVIDE:", f"{prediction_context}\nCONSIDER HOW THIS PRICE AFFECTS TRENDS AND LONG-TERM STRATEGIES.\n\nPROVIDE:")
+            # Step 2: Prepare Chart (40%)
+            status_text.text("📊 Preparing chart analysis...")
+            progress_bar.progress(40)
 
-            # Create and save the chart to a file in the temp directory
-            temp_dir = os.path.join(os.path.dirname(__file__), "temp")
-            os.makedirs(temp_dir, exist_ok=True)
+            if "Short-Term" in strategy_type:
+                prompt = prompt.replace("PROVIDE:", f"{prediction_context}\nCONSIDER HOW THIS PRICE AFFECTS SHORT-TERM INDICATORS AND MOMENTUM.\n\nPROVIDE:")
+            else:
+                prompt = prompt.replace("PROVIDE:", f"{prediction_context}\nCONSIDER HOW THIS PRICE AFFECTS TRENDS AND LONG-TERM STRATEGIES.\n\nPROVIDE:")
+
+            # Create temporary chart file using temp manager
+            chart_path = temp_manager.create_chart_file(ticker)
             
-            chart_path = os.path.join(temp_dir, f"{ticker}_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.png")
-            fig.write_image(chart_path)
+            # Save chart to temporary file (suppress verbose logging)
+            import logging as base_logging
+            kaleido_logger = base_logging.getLogger('kaleido')
+            original_level = kaleido_logger.level
+            kaleido_logger.setLevel(base_logging.WARNING)
+            
+            try:
+                fig.write_image(chart_path)
+                print(f"✅ Chart prepared for AI analysis")
+            except Exception as e:
+                print(f"❌ Error saving chart: {e}")
+                st.error(f"Failed to save chart: {e}")
+            finally:
+                kaleido_logger.setLevel(original_level)
+            
+            # Step 3: Run AI Analysis (60%)
+            status_text.text("🧠 Running AI analysis...")
+            progress_bar.progress(60)
             
             # Run AI analysis
             try:
@@ -300,11 +427,27 @@ PRICE CHANGE: ${price_change:.2f} ({(price_change/data['Close'].iloc[-1]*100):.1
                     ticker=ticker,
                     prompt=prompt
                 )
+                
+                # Step 4: Complete Analysis (100%)
+                status_text.text("✅ Analysis complete!")
+                progress_bar.progress(100)
+                
+                print("✅ AI MARKET ANALYSIS COMPLETED")
+                print("="*60 + "\n")
+                
                 st.session_state["ai_analysis_result"] = (analysis, chart_path, recommendation)
             except Exception as e:
+                status_text.text("❌ Analysis failed")
+                progress_bar.progress(0)
                 st.error(f"AI analysis failed: {e}")
                 import traceback
                 traceback.print_exc()
+            finally:
+                # Clear progress indicators after a short delay
+                import time
+                time.sleep(1)
+                progress_bar.empty()
+                status_text.empty()
 
     if st.session_state.get("ai_analysis_result") is None and st.session_state.get("ai_analysis_running"):
         st.info("AI analysis started... Please wait.")
@@ -354,11 +497,29 @@ PRICE CHANGE: ${price_change:.2f} ({(price_change/data['Close'].iloc[-1]*100):.1
         # Enhanced PDF Generation
         if st.button("📄 Generate Detailed Report"):
             with st.spinner("Generating comprehensive report..."):
-                generate_and_display_pdf(
-                    ticker, strategy_type, options_strategy, data, analysis, chart_path, levels, options_data, st.session_state["active_indicators"]
-                )
+                try:
+                    generate_and_display_pdf(
+                        ticker, strategy_type, options_strategy, data, analysis, chart_path, levels, options_data, st.session_state["active_indicators"]
+                    )
+                    print("✅ PDF report generated successfully")
+                    
+                    # Clean up temporary chart file after PDF generation
+                    if chart_path and os.path.exists(chart_path):
+                        temp_manager.cleanup_file(chart_path)
+                        print(f"🗑️ Cleaned up temporary chart: {chart_path}")
+                except Exception as e:
+                    st.error(f"Error generating PDF: {e}")
+                    print(f"❌ PDF generation error: {e}")
 
         st.session_state["ai_analysis_running"] = False
+
+        # Optional: Clean up temp files when user closes analysis
+        if st.button("🗑️ Clear Analysis & Clean Temp Files"):
+            if "ai_analysis_result" in st.session_state:
+                del st.session_state["ai_analysis_result"]
+            temp_manager.cleanup_all()
+            st.success("Analysis cleared and temporary files cleaned up!")
+            st.rerun()
 
 
 

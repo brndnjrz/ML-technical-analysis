@@ -1,9 +1,13 @@
 from typing import Dict, Any, List, Tuple
 import pandas as pd
+import logging
 from .analyst import AnalystAgent
 from .strategy import StrategyAgent
 from .execution import ExecutionAgent
 from .backtest import BacktestAgent
+
+# Setup logger for AI agents
+logger = logging.getLogger(__name__)
 
 class HedgeFundAI:
     """
@@ -11,7 +15,7 @@ class HedgeFundAI:
     """
     
     def analyze_and_recommend(self, data: pd.DataFrame, ticker: str, current_price: float) -> Dict[str, Any]:
-        print("[HedgeFundAI] Running analyze_and_recommend")
+        logger.debug(f"🤖 HedgeFundAI analyzing {ticker}")
         """
         Main analysis method that provides market analysis and recommendations.
         This is the primary interface used by ai_analysis.py.
@@ -84,7 +88,7 @@ class HedgeFundAI:
         self.backtester = BacktestAgent(config)
         
     def analyze_market(self, data: pd.DataFrame, ticker: str, fundamental_data: Dict[str, Any] = None) -> Dict[str, Any]:
-        print("[HedgeFundAI] Running analyze_market")
+        logger.debug(f"📊 Analyzing market conditions for {ticker}")
         """
         Perform comprehensive market analysis using all agents.
         """
