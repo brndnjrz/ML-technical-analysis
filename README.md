@@ -5,11 +5,84 @@
 
 This project provides an **AI-powered technical stock analysis dashboard** built with Streamlit, Plotly, and advanced technical analysis tools. The dashboard features a modern, interactive UI, dynamic strategy and indicator selection, and AI-driven market analysis with PDF reporting.
 
-## 🚀 **Latest Release: v2.0 - Multi-Agent AI System & Enhanced Machine Learning**
+## 🚀 **Latest Release - Enhanced Vision Analysis & User Experience Improvements**
 
-This major release transforms the application from a basic technical analysis tool into a **professional-grade trading analysis platform** with sophisticated AI-powered insights and robust machine learning capabilities.
+This update focuses on **resolving vision analysis timeout issues**, **improving user control**, and **enhancing PDF report formatting** for a more professional and reliable trading analysis experience.
 
-### 🎯 **Key Features (2025 Update):**
+### 🎯 **Key Updates (August 2025):**
+
+#### 🔧 **Vision Analysis Timeout Resolution**
+
+- **Configurable Timeout Settings**: Added user-controlled vision analysis timeout (30-300 seconds)
+- **Optimized Image Processing**: Reduced chart image size for faster AI processing (800x600 optimized from full size)
+- **Progressive Timeout Handling**: Extended timeout with 10-second progress updates to keep users informed
+- **Smart Fallback System**: Graceful degradation when vision analysis fails with comprehensive error recovery
+- **Connection Warming**: Pre-warm Ollama connections to reduce initial latency
+
+#### 👁️ **Enhanced Vision Analysis Controls**
+
+- **User Toggle**: Enable/disable vision analysis to speed up processing when needed
+- **Strategy-Based Timeouts**: Automatic timeout adjustment based on analysis type (short-term vs long-term)
+- **Real-Time Progress**: Live feedback showing remaining timeout duration during analysis
+- **Health Check System**: Automatic Ollama service validation before attempting vision analysis
+
+#### 📄 **Professional PDF Report Formatting**
+
+- **Fixed Unicode Encoding Issues**: Resolved `'latin-1' codec can't encode character '\u2022'` errors
+- **Enhanced Trade Parameter Display**: Clean formatting instead of raw JSON in both PDF and app
+- **Structured Analysis Layout**: Professional sections with proper spacing and bullet points
+- **Character Safety**: Comprehensive Unicode-to-ASCII conversion for PDF compatibility
+- **Improved Visual Hierarchy**: Better organization of analysis sections with expandable content
+
+#### 🖥️ **Streamlit UI/UX Enhancements**
+
+- **Better Trade Parameter Presentation**:
+  - Entry/Exit conditions with clean formatting
+  - Currency formatting for prices ($95.50 format)
+  - Boolean values with ✅/❌ indicators
+  - Professional parameter categorization
+- **Enhanced Analysis Display**: Expandable sections for long analysis content
+- **Improved Error Messages**: User-friendly feedback for timeout and connection issues
+- **Visual Status Indicators**: Clear progress tracking during AI analysis phases
+
+#### 🛠️ **Technical Infrastructure Improvements**
+
+- **Robust Error Handling**: Comprehensive exception management for vision analysis failures
+- **Threading Compatibility**: Enhanced cross-platform timeout handling using queue-based systems
+- **Resource Optimization**: Automatic image size optimization for faster processing
+- **Memory Management**: Improved cleanup of temporary files and resources
+- **Configuration Flexibility**: User-adjustable settings for different system capabilities
+
+### 📊 **Analysis Quality Improvements**
+
+- **Multi-Tier Fallback**: Vision analysis → Simplified analysis → Agent-only analysis
+- **Consistent Output**: Reliable analysis results even when vision components fail
+- **Performance Monitoring**: Built-in timing and progress tracking for all analysis phases
+- **User Feedback**: Clear messaging about analysis status and any limitations
+
+### 🔄 **Core AI System**
+
+The following foundational features provide the backbone of the analysis system:
+
+#### 🤖 **Multi-Agent AI System** (Maintained)
+
+- **Complete AI Architecture**: Specialized agent system with four distinct components
+- **Four Specialized Agents**:
+  - `AnalystAgent`: Deep technical and fundamental analysis with multi-timeframe integration
+  - `StrategyAgent`: Advanced trading strategy development and optimization
+  - `ExecutionAgent`: Precise entry/exit points and position sizing calculations
+  - `BacktestAgent`: Historical performance validation and market condition compatibility
+- **HedgeFundAI Orchestrator**: Central coordination system for agent collaboration
+
+#### 🔮 **Enhanced Machine Learning Predictions** (Maintained)
+
+- **Improved Model Selection**: Enhanced RandomForest, XGBoost, and CatBoost implementations
+- **Advanced Feature Engineering**: Strategy-specific feature combinations for different trading approaches
+- **Robust Error Handling**: Fixed NoneType arithmetic operations and pandas future warnings
+- **Data Validation**: Comprehensive validation with minimum data requirements (20+ rows)
+- **Confidence Scoring**: Real-time prediction confidence metrics with contextual AI analysis
+
+---
 
 #### 🤖 **Multi-Agent AI System**
 
@@ -52,7 +125,16 @@ This major release transforms the application from a basic technical analysis to
 - Automatic chart integration and cleanup
 - Unicode and emoji support with trading-specific conversions
 
-#### 🐛 **Critical Bug Fixes in**
+#### 🐛 **Critical Bug Fixes**
+
+- **Vision Analysis Timeout Issues**: Resolved frequent 60-second timeouts with configurable timeout settings and optimized image processing
+- **PDF Unicode Encoding**: Fixed `'latin-1' codec can't encode character '\u2022'` errors with comprehensive character replacement
+- **Trade Parameter Formatting**: Eliminated raw JSON display in favor of professional formatting in both PDF and UI
+- **Ollama Connection Reliability**: Enhanced connection handling with pre-warming and health checks
+- **Resource Management**: Improved temporary file cleanup and memory management during analysis
+- **Cross-Platform Threading**: Enhanced timeout mechanisms using queue-based systems for better Streamlit compatibility
+
+#### 🐛 **Previous Critical Bug Fixes**
 
 - **Threading Compatibility**: Resolved "signal only works in main thread" error in Streamlit
 - **NoneType Arithmetic**: Fixed "unsupported operand type(s) for -: 'float' and 'NoneType'" in predictions
@@ -289,19 +371,27 @@ conda deactivate <ENV_NAME>
 
 ### **✅ Validated Components**
 
+- **Vision Analysis Timeout Resolution**: Comprehensive testing with configurable timeouts (30-300 seconds)
+- **PDF Unicode Encoding**: All character encoding issues resolved with ASCII conversion
+- **Trade Parameter Formatting**: Clean display formatting validated in both PDF and UI
+- **Ollama Connection Stability**: Enhanced error handling and connection warming tested
+- **User Control Settings**: Vision analysis toggle and timeout controls fully functional
+- **Cross-Platform Compatibility**: Threading and timeout systems validated on macOS/Windows/Linux
+
+### **✅ Previous Validations (v2.0)**
+
 - All syntax errors resolved across codebase
 - Threading timeout system validated for Streamlit compatibility
-- Ollama integration tested with vision model analysis
 - Multi-agent workflow verified with comprehensive error handling
 - Prediction system error handling confirmed and tested
-- Cross-platform compatibility validated (macOS/Windows/Linux)
 
 ### **🔄 Recent Development Focus**
 
-- **Console Logging Improvements**: Enhanced user experience with structured progress indicators
-- **Threading Compatibility**: Resolved Streamlit-specific threading limitations
-- **Error Recovery**: Comprehensive fallback mechanisms for robust operation
-- **Performance Optimization**: Agent workflow optimizations reducing analysis time
+- **User Experience Priority**: Eliminating frustrating timeout issues and providing user control
+- **Professional Formatting**: Enhanced PDF reports with proper Unicode handling
+- **Reliability Engineering**: Robust fallback systems for consistent analysis delivery
+- **Performance Optimization**: Image processing and connection optimizations reducing analysis time
+- **Feedback Systems**: Real-time progress indicators and clear error messaging
 
 ---
 

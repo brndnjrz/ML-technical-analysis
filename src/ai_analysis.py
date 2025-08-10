@@ -74,8 +74,16 @@ def format_recommendation_summary(recommendation: dict) -> str:
    • Please check the detailed analysis below
 """
 
-def run_ai_analysis(fig, data: pd.DataFrame, ticker: str, prompt: str):
-    """Run enhanced AI analysis using both vision model and agent system"""
+def run_ai_analysis(fig, data: pd.DataFrame, ticker: str, prompt: str, vision_timeout: int = 120):
+    """Run enhanced AI analysis using both vision model and agent system
+    
+    Args:
+        fig: Plotly figure for chart analysis
+        data: Stock data DataFrame
+        ticker: Stock symbol
+        prompt: Analysis prompt
+        vision_timeout: Timeout for vision analysis in seconds (default: 120)
+    """
     
     print("🤖 AI ANALYSIS STARTING")
     print("=" * 50)
@@ -167,8 +175,24 @@ def run_ai_analysis(fig, data: pd.DataFrame, ticker: str, prompt: str):
             
             try:
                 buf = io.BytesIO()
-                fig.write_image(buf, format='png')
+                # Optimize image for faster processing - reduce size and quality
+                fig.write_image(buf, format='png', width=1200, height=800, scale=1.0)
                 buf.seek(0)
+                
+                # Check image size and optimize if too large
+                image_size = buf.getbuffer().nbytes
+                print(f"📊 Chart image size: {image_size / 1024:.1f} KB")
+                
+                if image_size > 500 * 1024:  # If larger than 500KB
+                    print("🔧 Optimizing large image for faster processing...")
+                    buf.seek(0)
+                    # Re-generate with smaller dimensions
+                    buf = io.BytesIO()
+                    fig.write_image(buf, format='png', width=800, height=600, scale=0.8)
+                    buf.seek(0)
+                    optimized_size = buf.getbuffer().nbytes
+                    print(f"✅ Optimized image size: {optimized_size / 1024:.1f} KB")
+                
                 image_data = base64.b64encode(buf.read()).decode('utf-8')
                 print("✅ Chart image prepared for AI vision analysis")
             except Exception as e:
@@ -183,8 +207,8 @@ def run_ai_analysis(fig, data: pd.DataFrame, ticker: str, prompt: str):
         print("📋 Skipping vision analysis - Ollama service unavailable")
         vision_response = {'message': {'content': 'Vision analysis unavailable. Ollama service is not running. Please start Ollama and ensure llama3.2-vision model is installed.'}}
         
-    # Only proceed with vision analysis if Ollama and model are available
-    if 'image_data' in locals():
+    # Only proceed with vision analysis if Ollama and model are available AND vision is enabled
+    if 'image_data' in locals() and vision_timeout > 0:
         # Create enhanced prompt with agent insights
         enhanced_prompt = f"""
         {prompt}
@@ -209,14 +233,23 @@ def run_ai_analysis(fig, data: pd.DataFrame, ticker: str, prompt: str):
         start_time = time.time()
         
         try:
-            # Use threading-based timeout instead of signal (Streamlit-compatible)
-            import threading
-            import queue
+            # Use threading-based timeout with better error handling
+            
             
             def run_ollama_chat():
-                """Run Ollama chat in a separate thread"""
+                """Run Ollama chat in a separate thread with connection warming"""
                 try:
-                    result = ollama.chat(model='llama3.2-vision', messages=messages)
+                    # Pre-warm the connection with a simple request first
+                    print("🔥 Warming up Ollama connection...")
+                    warm_up = ollama.chat(
+                        model='llama3.2-vision', 
+                        messages=[{'role': 'user', 'content': 'Hello'}],
+                        stream=False
+                    )
+                    print("✅ Connection warmed up successfully")
+                    
+                    # Now run the actual analysis
+                    result = ollama.chat(model='llama3.2-vision', messages=messages, stream=False)
                     return result
                 except Exception as e:
                     return {'error': str(e)}
@@ -235,21 +268,66 @@ def run_ai_analysis(fig, data: pd.DataFrame, ticker: str, prompt: str):
             thread.daemon = True
             thread.start()
             
-            # Wait for result with timeout
-            try:
-                vision_response = result_queue.get(timeout=60)  # 60 second timeout
-                if isinstance(vision_response, dict) and 'error' in vision_response:
-                    raise Exception(vision_response['error'])
-                    
+            # Wait for result with extended timeout and progress updates
+            timeout_duration = vision_timeout  # Use configurable timeout
+            check_interval = 10  # Check every 10 seconds
+            elapsed_time = 0
+            
+            while elapsed_time < timeout_duration:
+                try:
+                    vision_response = result_queue.get(timeout=check_interval)
+                    if isinstance(vision_response, dict) and 'error' in vision_response:
+                        raise Exception(vision_response['error'])
+                    break  # Success - exit the loop
+                except queue.Empty:
+                    elapsed_time += check_interval
+                    remaining = timeout_duration - elapsed_time
+                    print(f"⏳ Vision analysis in progress... {remaining}s remaining")
+                    continue
+            else:
+                # Timeout occurred
+                print(f"⏰ Vision analysis timed out after {timeout_duration} seconds")
+                vision_response = {
+                    'message': {
+                        'content': f'Vision analysis timed out after {timeout_duration} seconds. This may be due to high system load or a large image. The AI agent analysis above provides comprehensive trading insights without visual analysis.'
+                    }
+                }
+            
+            if 'vision_response' in locals() and 'error' not in vision_response:
                 duration = time.time() - start_time
                 print(f"✅ Vision analysis completed in {duration:.1f}s")
+            
+        except Exception as e:
+            print(f"❌ Error in vision analysis: {e}")
+            # Enhanced fallback with better error handling
+            try:
+                print("🔄 Attempting direct connection to Ollama...")
+                # Check if Ollama service is responsive
+                health_check = ollama.list()
+                print("✅ Ollama service is responsive, trying simplified request...")
                 
-            except queue.Empty:
-                print("⏰ Vision analysis timed out after 60 seconds")
-                vision_response = {'message': {'content': 'Vision analysis timed out. The chart shows technical indicators that can be analyzed manually. Please refer to the AI agent analysis above for trading insights.'}}
-            except Exception as ollama_error:
-                print(f"❌ Ollama connection error: {ollama_error}")
-                vision_response = {'message': {'content': 'Vision analysis unavailable. Ollama service may not be running or the llama3.2-vision model may not be installed. Please refer to the AI agent analysis above for trading insights.'}}
+                # Try with a much shorter, simpler prompt
+                simple_messages = [{
+                    'role': 'user',
+                    'content': 'Analyze this trading chart briefly. Focus on key trends and signals.',
+                    'images': [image_data]
+                }]
+                
+                vision_response = ollama.chat(
+                    model='llama3.2-vision', 
+                    messages=simple_messages,
+                    stream=False
+                )
+                duration = time.time() - start_time
+                print(f"✅ Simplified vision analysis completed in {duration:.1f}s")
+                
+            except Exception as fallback_error:
+                print(f"❌ All vision analysis attempts failed: {fallback_error}")
+                vision_response = {
+                    'message': {
+                        'content': 'Vision analysis failed due to connection issues. The AI agent analysis above provides comprehensive trading insights. Consider checking Ollama service status or restarting the service.'
+                    }
+                }
                 
         except Exception as e:
             print(f"❌ Error in vision analysis: {e}")
@@ -262,6 +340,14 @@ def run_ai_analysis(fig, data: pd.DataFrame, ticker: str, prompt: str):
             except Exception as fallback_error:
                 print(f"❌ Fallback also failed: {fallback_error}")
                 vision_response = {'message': {'content': 'Vision analysis failed due to connection issues. Please refer to the AI agent analysis above for trading insights.'}}
+    else:
+        # Vision analysis is disabled or unavailable
+        if vision_timeout == 0:
+            print("📋 Vision analysis disabled by user - using AI agent analysis only")
+            vision_response = {'message': {'content': 'Vision analysis disabled. Analysis based on quantitative indicators and AI agent recommendations above.'}}
+        else:
+            print("📋 Vision analysis unavailable - using AI agent analysis only")
+            vision_response = {'message': {'content': 'Vision analysis unavailable. Analysis based on quantitative indicators and AI agent recommendations above.'}}
     
     # Combine both analyses
     combined_analysis = f"""
