@@ -99,10 +99,16 @@ def create_chart(
                         fig.add_trace(go.Scatter(x=data.index, y=data[lower], name="BB Lower"), row=i, col=1)
             # Support/Resistance
             if levels:
-                for s in levels.get("support", []):
-                    fig.add_hline(y=s, line_dash="dot", line_color="green", annotation_text="Support", row=i, col=1)
-                for r in levels.get("resistance", []):
-                    fig.add_hline(y=r, line_dash="dot", line_color="red", annotation_text="Resistance", row=i, col=1)
+                # Make sure levels is a dictionary
+                if isinstance(levels, dict):
+                    # Add support levels
+                    if "support" in levels and isinstance(levels["support"], list):
+                        for s in levels["support"]:
+                            fig.add_hline(y=s, line_dash="dot", line_color="green", annotation_text="Support", row=i, col=1)
+                    # Add resistance levels
+                    if "resistance" in levels and isinstance(levels["resistance"], list):
+                        for r in levels["resistance"]:
+                            fig.add_hline(y=r, line_dash="dot", line_color="red", annotation_text="Resistance", row=i, col=1)
         elif title == "RSI":
             col = f"RSI_{timeframe}" if f"RSI_{timeframe}" in data.columns else "RSI"
             if col in data.columns:

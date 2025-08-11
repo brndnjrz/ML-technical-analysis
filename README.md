@@ -5,60 +5,59 @@
 
 This project provides an **AI-powered technical stock analysis dashboard** built with Streamlit, Plotly, and advanced technical analysis tools. The dashboard features a modern, interactive UI, dynamic strategy and indicator selection, and AI-driven market analysis with PDF reporting.
 
-## 🚀 **Latest Release - Enhanced Vision Analysis & User Experience Improvements**
+## 🚀 **Latest Release - AI-Enhanced Options Analysis & UX Improvements**
 
-This update focuses on **resolving vision analysis timeout issues**, **improving user control**, and **enhancing PDF report formatting** for a more professional and reliable trading analysis experience.
+This update focuses on **enhancing options trading analysis**, **improving AI decision-making capabilities**, **resolving timeout and data handling issues**, and **enhancing error resilience** for a more robust and sophisticated trading analysis experience.
 
 ### 🎯 **Key Updates (August 2025):**
 
-#### 🔧 **Vision Analysis Timeout Resolution**
+#### � **Enhanced Options Trading Intelligence**
 
-- **Configurable Timeout Settings**: Added user-controlled vision analysis timeout (30-300 seconds)
-- **Optimized Image Processing**: Reduced chart image size for faster AI processing (800x600 optimized from full size)
-- **Progressive Timeout Handling**: Extended timeout with 10-second progress updates to keep users informed
-- **Smart Fallback System**: Graceful degradation when vision analysis fails with comprehensive error recovery
-- **Connection Warming**: Pre-warm Ollama connections to reduce initial latency
+- **Comprehensive Strike Selection**: New AI-driven methodology combining Standard Deviation, Technical Levels, and Delta-Based approaches
+- **Simplified User Interface**: Removed manual strike method selection in favor of intelligent AI decision-making
+- **Enhanced Options Analytics**: Improved IV Rank, HV calculations, and volatility skew metrics
+- **Intelligent Strategy Selection**: Enhanced AI capability to recommend optimal options strategies for current market conditions
+- **Multi-Method Weighting System**: Dynamic weighting of different strike selection techniques based on strategy type
 
-#### 👁️ **Enhanced Vision Analysis Controls**
+#### �️ **Core Application Improvements**
 
-- **User Toggle**: Enable/disable vision analysis to speed up processing when needed
-- **Strategy-Based Timeouts**: Automatic timeout adjustment based on analysis type (short-term vs long-term)
-- **Real-Time Progress**: Live feedback showing remaining timeout duration during analysis
-- **Health Check System**: Automatic Ollama service validation before attempting vision analysis
+- **Session State Management**: Fixed state persistence issues with analysis results and UI components
+- **Error Resilience**: Comprehensive handling of connection timeouts when fetching fundamental data
+- **Type Safety**: Enhanced type checking and validation for critical data structures
+- **Tab-Based Interface**: Improved organization with dedicated tabs for different analysis types
+- **PDF Report Enhancements**: Fixed report generation errors and improved formatting consistency
 
-#### 📄 **Professional PDF Report Formatting**
+#### 📊 **Data Handling & API Resilience**
 
-- **Fixed Unicode Encoding Issues**: Resolved `'latin-1' codec can't encode character '\u2022'` errors
-- **Enhanced Trade Parameter Display**: Clean formatting instead of raw JSON in both PDF and app
-- **Structured Analysis Layout**: Professional sections with proper spacing and bullet points
-- **Character Safety**: Comprehensive Unicode-to-ASCII conversion for PDF compatibility
-- **Improved Visual Hierarchy**: Better organization of analysis sections with expandable content
+- **Fundamental Data Optimization**: Reduced timeout issues with Yahoo Finance API through fast_info implementation
+- **Fallback Systems**: Graceful degradation when external data sources are unavailable
+- **Data Type Validation**: Comprehensive checking to prevent "object has no attribute" errors
+- **Default Values**: Intelligent fallbacks when specific data points are unavailable
+- **Error Recovery**: Automatic retry and alternative data source mechanisms
 
-#### 🖥️ **Streamlit UI/UX Enhancements**
+#### 🧠 **AI Analysis Enhancements**
 
-- **Better Trade Parameter Presentation**:
-  - Entry/Exit conditions with clean formatting
-  - Currency formatting for prices ($95.50 format)
-  - Boolean values with ✅/❌ indicators
-  - Professional parameter categorization
-- **Enhanced Analysis Display**: Expandable sections for long analysis content
-- **Improved Error Messages**: User-friendly feedback for timeout and connection issues
-- **Visual Status Indicators**: Clear progress tracking during AI analysis phases
+- **Comprehensive Strike Selection Algorithm**: New integrated approach combining statistical, technical, and probability methods
+- **Weighted Strike Analysis**: Strategy-specific weighting of different strike selection methods
+- **Advanced Options Strategy Customization**: Enhanced parameter tuning based on market conditions
+- **Support/Resistance Integration**: Better utilization of key price levels in options strategy development
+- **Dynamic Strike Rounding**: Intelligent rounding based on price levels for more practical strike selections
 
-#### 🛠️ **Technical Infrastructure Improvements**
+#### � **System Architecture Improvements**
 
-- **Robust Error Handling**: Comprehensive exception management for vision analysis failures
-- **Threading Compatibility**: Enhanced cross-platform timeout handling using queue-based systems
-- **Resource Optimization**: Automatic image size optimization for faster processing
-- **Memory Management**: Improved cleanup of temporary files and resources
-- **Configuration Flexibility**: User-adjustable settings for different system capabilities
+- **Modular Component Design**: Enhanced separation of concerns with dedicated UI components
+- **Consistent State Management**: Improved session state handling across application components
+- **Error Propagation**: Better error messages and feedback throughout the application stack
+- **External API Resilience**: Robust handling of third-party service failures
+- **Configuration Centralization**: Enhanced use of central configuration for application settings
 
-### 📊 **Analysis Quality Improvements**
+### � **Trading Analysis Improvements**
 
-- **Multi-Tier Fallback**: Vision analysis → Simplified analysis → Agent-only analysis
-- **Consistent Output**: Reliable analysis results even when vision components fail
-- **Performance Monitoring**: Built-in timing and progress tracking for all analysis phases
-- **User Feedback**: Clear messaging about analysis status and any limitations
+- **Multi-Method Strike Selection**: Combines statistical, technical, and delta-based approaches for optimal strike choices
+- **Enhanced Strategy Specificity**: More targeted recommendations based on exact market conditions
+- **Defensive Programming**: Robust data handling to ensure analysis completes even with partial data
+- **Intelligent Fallbacks**: Graceful degradation when specific data points are unavailable
+- **Type-Safe Display**: Improved formatting for numeric vs string data in charts and tables
 
 ### 🔄 **Core AI System**
 
@@ -177,7 +176,7 @@ The following foundational features provide the backbone of the analysis system:
 │   ├── ai_agents/
 │   │   ├── __init__.py      # Agent system initialization
 │   │   ├── analyst.py       # Technical/Fundamental analysis agent
-│   │   ├── strategy.py      # Strategy development agent
+│   │   ├── strategy.py      # Strategy development agent with enhanced strike selection
 │   │   ├── execution.py     # Trade execution agent
 │   │   ├── hedge_fund.py    # Main AI orchestrator
 │   │   └── backtest.py      # Strategy validation agent
@@ -185,10 +184,15 @@ The following foundational features provide the backbone of the analysis system:
 │   ├── pdf_utils.py         # PDF utilities and display
 │   ├── data_pipeline.py     # Data processing pipeline
 │   ├── prediction.py        # ML models and feature engineering
-│   ├── ui_components.py     # UI components and layouts
+│   ├── ui_components/       # Modular UI components
+│   │   ├── __init__.py      # Component initialization
+│   │   ├── options_analyzer.py # Options analysis component
+│   │   ├── options_strategy_selector.py # Strategy selection UI
+│   │   ├── sidebar_config.py # Sidebar configuration component
+│   │   └── sidebar_indicators.py # Indicator selection component
 │   ├── config.py           # Configuration settings
-│   ├── logging_config.py    # Centralized logging configuration (NEW)
-│   ├── temp_manager.py      # Temporary file management (NEW)
+│   ├── logging_config.py    # Centralized logging configuration
+│   ├── temp_manager.py      # Temporary file management
 │   └── trading_strategies.py # Trading strategy definitions
 ```
 

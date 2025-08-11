@@ -13,7 +13,7 @@ import logging
 # Setup logger for AI analysis
 logger = logging.getLogger(__name__)
 
-def format_recommendation_summary(recommendation: dict) -> str:
+def format_recommendation_summary(recommendation: dict, options_priority: bool = False) -> str:
     """Format the AI recommendation into a readable summary"""
     try:
         market = recommendation.get('market_analysis', {})
@@ -21,6 +21,9 @@ def format_recommendation_summary(recommendation: dict) -> str:
         signals = recommendation.get('signals', {})
         risk = recommendation.get('risk_assessment', {})
         consensus = recommendation.get('consensus_details', {})
+        
+        # Add options priority info
+        options_priority_info = recommendation.get('options_priority', options_priority)
         
         # Safe formatting with None checks
         def safe_format(value, format_type='str', default='N/A'):
@@ -69,6 +72,7 @@ def format_recommendation_summary(recommendation: dict) -> str:
    • Action: {safe_format(recommendation.get('action'))}
    • Confidence: {safe_format(strategy.get('confidence'), 'percent', '0%')}
    • Position Type: {safe_format(strategy.get('type')).upper()}
+   {f"• Options Focus: {'✅ ENABLED' if options_priority_info else '❌ DISABLED'}" if 'options_priority_info' in locals() else ""}
 
 🎯 Trade Parameters:
    • Entry Price: {safe_format(recommendation.get('entry_price'), 'price', '$0.00')}
@@ -92,7 +96,7 @@ def format_recommendation_summary(recommendation: dict) -> str:
    • Please check the detailed analysis below
 """
 
-def run_ai_analysis(fig, data: pd.DataFrame, ticker: str, prompt: str, vision_timeout: int = 120):
+def run_ai_analysis(fig, data: pd.DataFrame, ticker: str, prompt: str, vision_timeout: int = 120, options_priority: bool = True):
     """Run enhanced AI analysis using both vision model and agent system
     
     Args:
@@ -101,6 +105,7 @@ def run_ai_analysis(fig, data: pd.DataFrame, ticker: str, prompt: str, vision_ti
         ticker: Stock symbol
         prompt: Analysis prompt
         vision_timeout: Timeout for vision analysis in seconds (default: 120)
+        options_priority: Whether to prioritize options strategies (default: True)
     """
     
     print("🤖 AI HEDGE FUND ANALYSIS STARTING")
@@ -113,10 +118,40 @@ def run_ai_analysis(fig, data: pd.DataFrame, ticker: str, prompt: str, vision_ti
     print("   • Execution Agent: Risk and timing analysis")
     print("   • Building investment committee consensus...")
     
-    ai_system = HedgeFundAI()
+    # Check if we should prioritize options strategies (calls, puts, and iron condors)
+    # Use the options_priority parameter from the UI checkbox
+    if options_priority:
+        print("📈 Prioritizing options strategies (calls, puts, and iron condors)")
+        config = {
+            'prioritize_options_strategies': True,
+            'preferred_strategies': ['Day Trading Calls/Puts', 'Iron Condor', 'Butterfly Spread']
+        }
+    else:
+        print("📈 Using balanced strategy mix (stocks and options)")
+        config = {}
+    
+    ai_system = HedgeFundAI(config)
     current_price = data['Close'].iloc[-1]
     
-    recommendation = ai_system.analyze_and_recommend(data, ticker, current_price)
+    # Initialize options data
+    options_data = {}
+    
+    # Try to get options data from session state if available
+    try:
+        import streamlit as st
+        if 'options' in st.session_state and ticker in st.session_state['options']:
+            options_data = st.session_state['options'][ticker]
+            print("📊 Adding options metrics to analysis")
+    except (ImportError, KeyError, TypeError):
+        print("⚠️ No options data available for analysis")
+    
+    recommendation = ai_system.analyze_and_recommend(
+        data, 
+        ticker, 
+        current_price, 
+        options_priority, 
+        options_data=options_data
+    )
     
     # Show consensus details if available
     if 'consensus_details' in recommendation:
@@ -132,7 +167,8 @@ def run_ai_analysis(fig, data: pd.DataFrame, ticker: str, prompt: str, vision_ti
                 print(f"   • Conflicts Resolved: {len(conflicts)} strategy conflicts addressed")
     
     # Log formatted summary instead of raw JSON
-    summary = format_recommendation_summary(recommendation)
+    recommendation['options_priority'] = options_priority  # Add options priority to recommendation
+    summary = format_recommendation_summary(recommendation, options_priority)
     print(summary)
 
     # 2. Get Vision Model Analysis
@@ -385,6 +421,49 @@ def run_ai_analysis(fig, data: pd.DataFrame, ticker: str, prompt: str, vision_ti
             print("📋 Vision analysis unavailable - using AI agent analysis only")
             vision_response = {'message': {'content': 'Vision analysis unavailable. Analysis based on quantitative indicators and AI agent recommendations above.'}}
     
+    # Helper function to format trade parameters in a more readable way
+    def format_trade_params(params):
+        if not params:
+            return "No parameters available"
+            
+        formatted_params = []
+        for key, value in params.items():
+            # Format the key nicely
+            formatted_key = key.replace('_', ' ').title()
+            
+            # Format the value based on its type
+            if isinstance(value, dict):
+                # Handle nested dictionaries (like risk_management)
+                formatted_params.append(f"• {formatted_key}:")
+                for subkey, subvalue in value.items():
+                    formatted_subkey = subkey.replace('_', ' ').title()
+                    if isinstance(subvalue, list):
+                        formatted_params.append(f"  • {formatted_subkey}:")
+                        for item in subvalue:
+                            formatted_params.append(f"    • {item}")
+                    else:
+                        formatted_params.append(f"  • {formatted_subkey}: {subvalue}")
+            elif isinstance(value, list):
+                # Handle lists
+                formatted_params.append(f"• {formatted_key}:")
+                for item in value:
+                    formatted_params.append(f"  • {item}")
+            elif isinstance(value, bool):
+                # Format boolean values
+                formatted_value = "✅ Yes" if value else "❌ No"
+                formatted_params.append(f"• {formatted_key}: {formatted_value}")
+            elif isinstance(value, (int, float)):
+                # Format numeric values
+                if 'price' in key.lower() or 'stop' in key.lower() or 'target' in key.lower():
+                    formatted_params.append(f"• {formatted_key}: ${value:.2f}")
+                else:
+                    formatted_params.append(f"• {formatted_key}: {value}")
+            else:
+                # Format all other values
+                formatted_params.append(f"• {formatted_key}: {value}")
+                
+        return '\n'.join(formatted_params)
+    
     # Combine both analyses
     combined_analysis = f"""
     🤖 AI TRADING ANALYSIS
@@ -401,7 +480,7 @@ def run_ai_analysis(fig, data: pd.DataFrame, ticker: str, prompt: str, vision_ti
     - Risk Level: {recommendation['risk_assessment'].get('risk_level', 'N/A')}
     
     📈 Trade Parameters:
-    {json.dumps(recommendation['strategy'].get('parameters', {}), indent=2)}
+    {format_trade_params(recommendation['strategy'].get('parameters', {}))}
     
     👁️ Visual Analysis:
     {vision_response['message']['content']}

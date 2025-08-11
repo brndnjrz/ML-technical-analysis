@@ -1,0 +1,108 @@
+"""
+Sidebar Configuration Components
+
+This module provides the sidebar configuration UI components.
+"""
+
+import streamlit as st
+import datetime
+from datetime import timedelta
+from typing import Dict, Any, Tuple, List, Optional
+from src.config import DEFAULT_TICKER, DEFAULT_START_DATE, DEFAULT_END_DATE
+
+def sidebar_config(config=None):
+    """
+    Display sidebar configuration options for the app
+    
+    Args:
+        config: Optional configuration dictionary
+    
+    Returns:
+        Tuple of (ticker, start_date, end_date, interval, analysis_type, 
+                 strategy_type, options_strategy, options_priority)
+    """
+    st.sidebar.title("Trading Assistant")
+    
+    ticker = st.sidebar.text_input("Enter Stock Symbol", DEFAULT_TICKER)
+    
+    # Date range selection
+    start_date = st.sidebar.date_input("Start Date", DEFAULT_START_DATE.date())
+    end_date = st.sidebar.date_input("End Date", DEFAULT_END_DATE.date())
+    
+    interval_options = {
+        "1d": "Daily",
+        "1wk": "Weekly",
+        "1mo": "Monthly"
+    }
+    interval = st.sidebar.selectbox(
+        "Select Timeframe:",
+        options=list(interval_options.keys()),
+        format_func=lambda x: interval_options[x],
+        index=0
+    )
+    analysis_type = st.sidebar.selectbox(
+        "Analysis Type:",
+        ["Options Trading Strategy", "Stock Buy/Hold/Sell", "Advanced Analysis (AI Ensemble)"]
+    )
+    strategy_type = None
+    options_strategy = None
+    
+    # Set strategy type for all analysis types
+    if analysis_type == "Options Trading Strategy":
+        strategy_type = st.sidebar.selectbox(
+            "Trading Timeframe:",
+            ["Short-Term (1-7 days)", "Medium-Term (1-4 weeks)", "Long-Term (1-3 months)"],
+            index=1
+        )
+        
+        # AI will automatically select the optimal strategy
+        st.sidebar.info("🤖 AI will select the optimal options strategy based on current market conditions")
+        options_strategy = "AI-Selected"
+        
+        # Show the types of strategies that may be considered
+        with st.sidebar.expander("What strategies will be considered?"):
+            st.markdown("""
+            The AI system will analyze market conditions to select the optimal strategy from:
+            
+            **Directional Strategies:**
+            - Long Calls/Puts
+            - Debit Spreads
+            - LEAPS Options
+            
+            **Income Strategies:**
+            - Credit Spreads
+            - Cash-Secured Puts
+            - Covered Calls
+            
+            **Volatility Strategies:**
+            - Iron Condor
+            - Butterfly Spread
+            - Calendar Spread
+            """)
+            
+        # The AI now uses a comprehensive approach combining all strike selection methods
+        st.sidebar.info("🧠 AI will analyze strikes using multiple methods: Standard Deviation, Technical Levels, and Delta-Based approaches for optimal selection")
+        strike_method = "AI-Comprehensive"
+    elif analysis_type == "Stock Buy/Hold/Sell":
+        strategy_type = st.sidebar.selectbox(
+            "Trading Timeframe:",
+            ["Short-Term (1-7 days)", "Long-Term (1-3 weeks)", "Custom"],
+            index=1
+        )
+        if "Short-Term" in strategy_type:
+            options_strategy = "Day Trading"
+        elif "Long-Term" in strategy_type:
+            options_strategy = "Swing Trading"
+    
+    # Options Priority Checkbox
+    options_priority = False
+    if analysis_type == "Options Trading Strategy":
+        options_priority = True
+    elif analysis_type == "Advanced Analysis (AI Ensemble)":
+        options_priority = st.sidebar.checkbox(
+            "Prioritize Options Strategies", 
+            value=True,
+            help="Focus on options-based strategies (calls, puts, spreads) rather than stock positions"
+        )
+        
+    return ticker, start_date, end_date, interval, analysis_type, strategy_type, options_strategy, options_priority

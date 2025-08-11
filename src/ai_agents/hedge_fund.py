@@ -41,12 +41,25 @@ class HedgeFundAI:
             'min_confidence': 0.5       # 50% minimum confidence for trades
         }
     
-    def analyze_and_recommend(self, data: pd.DataFrame, ticker: str, current_price: float) -> Dict[str, Any]:
+    def analyze_and_recommend(self, data: pd.DataFrame, ticker: str, current_price: float, options_priority: bool = False, options_data: Dict[str, Any] = None) -> Dict[str, Any]:
         """
         MAIN HEDGE FUND ANALYSIS ENGINE
         
         Coordinates all agents to provide unified, consensus-driven recommendations.
         Uses ensemble methodology to avoid conflicting signals.
+        
+        Parameters:
+        -----------
+        data : pd.DataFrame
+            Historical price and indicator data
+        ticker : str
+            Stock symbol
+        current_price : float
+            Current market price
+        options_priority : bool
+            Whether to prioritize options strategies
+        options_data : Dict[str, Any], optional
+            Options chain data if available (implied volatility, chains, etc.)
         """
         logger.info(f"🏛️ HEDGE FUND AI: Analyzing {ticker} at ${current_price:.2f}")
         
@@ -56,7 +69,38 @@ class HedgeFundAI:
             
             # Get analysis from each specialist agent
             analyst_view = self.analyst.analyze_technical_indicators(data)
-            strategy_view = self.strategist.develop_strategy(analyst_view, data)
+            
+                        # Add options priority to strategy agent if requested
+            if options_priority:
+                self.config['prioritize_options_strategies'] = True
+                
+                # Analyze options indicators to determine best strategy focus
+                if 'IC_SUITABILITY' in data.columns:
+                    ic_score = data['IC_SUITABILITY'].iloc[-1]
+                    
+                    # High IC suitability score (>70) suggests iron condor or butterfly strategy
+                    if ic_score > 70:
+                        self.config['preferred_strategies'] = ['Iron Condor', 'Butterfly Spread', 'Calendar Spread']
+                        logger.info(f"📈 Options strategies prioritized: Iron Condor (Suitability: {ic_score:.1f})")
+                    # Medium IC suitability (40-70) suggests directional spreads
+                    elif ic_score > 40:
+                        self.config['preferred_strategies'] = ['Bull Put Spread', 'Bear Call Spread', 'Calendar Spread']
+                        logger.info(f"📈 Options strategies prioritized: Vertical Spreads (Suitability: {ic_score:.1f})")
+                    # Low IC suitability (<40) suggests directional strategies
+                    else:
+                        self.config['preferred_strategies'] = ['Day Trading Calls/Puts', 'LEAPS Options', 'Bull Call Spread']
+                        logger.info(f"📈 Options strategies prioritized: Directional Calls/Puts (Suitability: {ic_score:.1f})")
+                else:
+                    # Default if no specific indicators available
+                    self.config['preferred_strategies'] = ['Day Trading Calls/Puts', 'Iron Condor', 'Bull Call Spread']
+                    logger.info("📈 Options strategies prioritized: Mixed options strategies")
+            else:
+                # Still use the selected strategies but without preference
+                self.config['prioritize_options_strategies'] = False
+                self.config['preferred_strategies'] = ['Swing Trading', 'Day Trading', 'Day Trading Calls/Puts']
+                logger.info("📈 Using balanced strategy selection (no options priority)")
+                
+            strategy_view = self.strategist.develop_strategy(analyst_view, data, options_priority, options_data)
             execution_view = self.executor.generate_signals(strategy_view, data)
             
             # PHASE 2: Consensus Building
@@ -143,6 +187,11 @@ class HedgeFundAI:
             
             consensus['final_decision'] = self._make_final_decision(consensus, agent_views)
             
+            # Add consensus metadata for reporting
+            consensus['consensus_reached'] = consensus['agreement_score'] >= self.consensus_threshold
+            consensus['threshold'] = self.consensus_threshold
+            consensus['conflicts'] = consensus.get('conflicting_views', [])
+            
         except Exception as e:
             logger.error(f"❌ Consensus building error: {str(e)}")
             consensus['agreement_score'] = 0.5  # Default moderate agreement
@@ -156,14 +205,32 @@ class HedgeFundAI:
             
             # Extract current market metrics
             current_price = data['Close'].iloc[-1] if len(data) > 0 else 0.0
-            rsi = data['RSI'].iloc[-1] if 'RSI' in data and len(data) > 0 else 50.0
+            logger.info(f"🏛️ HEDGE FUND AI: Analyzing {data.name if hasattr(data, 'name') else 'ticker'} at ${current_price:.2f}")
+            
+            # RSI - Try multiple common column names
+            rsi = 50.0  # Default neutral RSI
+            for rsi_col in ['RSI', 'RSI_14', 'RSI_1d', 'RSI (14)']:
+                if rsi_col in data.columns and len(data) > 0:
+                    rsi = data[rsi_col].iloc[-1]
+                    break
+            
+            # ATR - Find ATR for volatility calculation
+            atr = 0.0
+            for atr_col in ['ATR', 'ATR_14', 'ATR_1d']:
+                if atr_col in data.columns and len(data) > 0:
+                    atr = data[atr_col].iloc[-1]
+                    break
             
             # MACD Signal Analysis
             macd_signal = 'neutral'
-            if 'MACD' in data and 'MACD_Signal' in data and len(data) > 0:
-                macd_val = data['MACD'].iloc[-1]
-                macd_sig = data['MACD_Signal'].iloc[-1]
-                macd_signal = 'bullish' if macd_val > macd_sig else 'bearish'
+            for macd_col in ['MACD', 'MACD_1d']:
+                if macd_col in data.columns and len(data) > 0:
+                    signal_col = f"{macd_col.split('_')[0]}_Signal" if '_' in macd_col else 'MACD_Signal'
+                    if signal_col in data.columns:
+                        macd_val = data[macd_col].iloc[-1]
+                        macd_sig = data[signal_col].iloc[-1]
+                        macd_signal = 'bullish' if macd_val > macd_sig else 'bearish'
+                        break
             
             # Volume Analysis
             volume_signal = 'unknown'
@@ -172,8 +239,12 @@ class HedgeFundAI:
                 avg_vol = data['Volume'].rolling(20).mean().iloc[-1]
                 volume_signal = 'high' if current_vol > avg_vol * 1.2 else 'low' if current_vol < avg_vol * 0.8 else 'normal'
             
-            # Trend Strength
-            trend_strength = data['ADX'].iloc[-1] if 'ADX' in data and len(data) > 0 else 0.0
+            # Trend Strength - Try multiple ADX column names
+            trend_strength = 0.0
+            for adx_col in ['ADX', 'ADX_14', 'ADX_1d']:
+                if adx_col in data and len(data) > 0:
+                    trend_strength = data[adx_col].iloc[-1]
+                    break
             
             return {
                 'RSI': rsi,
@@ -240,9 +311,19 @@ class HedgeFundAI:
     def _consensus_risk_assessment(self, agent_views: Dict[str, Any], data: pd.DataFrame) -> Dict[str, Any]:
         """Assess overall risk based on all agent inputs"""
         try:
-            # Collect risk factors from all agents
-            volatility = data['ATR'].iloc[-1] / data['Close'].iloc[-1] if 'ATR' in data and len(data) > 0 else 0.02
-            trend_strength = data['ADX'].iloc[-1] if 'ADX' in data and len(data) > 0 else 0.0
+            # Collect risk factors from all agents - use flexible column names
+            volatility = 0.02  # Default
+            for atr_col in ['ATR', 'ATR_14', 'ATR_1d']:
+                if atr_col in data and len(data) > 0:
+                    volatility = data[atr_col].iloc[-1] / data['Close'].iloc[-1]
+                    break
+            
+            # Get trend strength with flexible column names
+            trend_strength = 0.0
+            for adx_col in ['ADX', 'ADX_14', 'ADX_1d']:
+                if adx_col in data and len(data) > 0:
+                    trend_strength = data[adx_col].iloc[-1]
+                    break
             
             # Calculate composite risk score
             risk_factors = {
@@ -317,6 +398,13 @@ class HedgeFundAI:
                 'risk_assessment': risk_assessment,
                 'parameters': self._generate_trade_parameters(strategy, execution_plan, market_analysis),
                 'consensus_score': consensus['agreement_score'],
+                'consensus_details': {
+                    'agreement_score': consensus.get('agreement_score', 0.0),
+                    'consensus_reached': consensus.get('consensus_reached', False),
+                    'threshold': consensus.get('threshold', self.consensus_threshold),
+                    'conflicts': consensus.get('conflicts', []),
+                    'final_decision': consensus.get('final_decision', action)
+                },
                 'hedge_fund_notes': self._generate_hedge_fund_notes(consensus, action, strategy)
             }
             
@@ -367,14 +455,47 @@ class HedgeFundAI:
         try:
             base_params = strategy.get('parameters', {})
             
+            # Calculate concrete price values if not available
+            current_price = market_analysis.get('current_price', 0)
+            
+            # Default values based on current price and ATR
+            atr_value = market_analysis.get('ATR', current_price * 0.01)  # Default to 1% of price if ATR not available
+            
+            # Calculate stop loss and take profit if not provided
+            stop_loss = execution_plan.get('stop_loss')
+            if stop_loss is None and current_price > 0:
+                if strategy.get('type') == 'long' or strategy.get('name', '').lower().find('call') >= 0:
+                    stop_loss = current_price * 0.97  # 3% stop loss for long positions
+                else:
+                    stop_loss = current_price * 1.03  # 3% stop loss for short positions
+                    
+            take_profit = execution_plan.get('take_profit')
+            if take_profit is None and current_price > 0:
+                if strategy.get('type') == 'long' or strategy.get('name', '').lower().find('call') >= 0:
+                    take_profit = current_price * 1.05  # 5% profit target for long positions
+                else:
+                    take_profit = current_price * 0.95  # 5% profit target for short positions
+                    
+            # Calculate position size based on risk
+            position_size = execution_plan.get('position_size', 0.05)
+            if position_size <= 0.1 and current_price > 0:
+                # Calculate actual shares based on $10K account
+                risk_per_share = abs(current_price - stop_loss) if stop_loss else current_price * 0.03
+                if risk_per_share > 0:
+                    # Base calculation on a standard $10,000 account with 2% max risk
+                    position_size = round((10000 * 0.02) / risk_per_share, 1)
+                    if position_size < 1:
+                        position_size = 1  # Minimum 1 share
+            
             # Add execution-specific parameters
             trade_params = {
                 **base_params,
                 'entry_condition': execution_plan.get('entry', {}).get('type', 'market_confirmation'),
                 'exit_condition': execution_plan.get('exit', {}).get('type', 'profit_target_or_stop'),
-                'position_size': execution_plan.get('position_size', 0.05),  # 5% default
-                'stop_loss': execution_plan.get('stop_loss'),
-                'take_profit': execution_plan.get('take_profit'),
+                'position_size': position_size,
+                'entry_price': current_price,
+                'stop_loss': stop_loss,
+                'take_profit': take_profit,
                 'max_holding_period': strategy.get('timeframe', 'short_term'),
                 'volatility_adjustment': market_analysis.get('trend_strength', 0.0) > 25
             }
@@ -484,11 +605,17 @@ class HedgeFundAI:
                 return 0.5
             
             # Simple majority agreement
-            bullish_count = sum(1 for s in valid_signals if str(s).lower() in ['bullish', 'buy', 'long', 'momentum'])
-            bearish_count = sum(1 for s in valid_signals if str(s).lower() in ['bearish', 'sell', 'short', 'mean_reversion'])
+            signal_counts = {}
+            for signal in valid_signals:
+                signal_str = str(signal).lower()
+                signal_counts[signal_str] = signal_counts.get(signal_str, 0) + 1
             
-            total = len(valid_signals)
-            return max(bullish_count, bearish_count) / total if total > 0 else 0.5
+            if not signal_counts:
+                return 0.5
+                
+            max_count = max(signal_counts.values())
+            total_count = len(valid_signals)
+            return max_count / total_count
             
         except Exception:
             return 0.5
@@ -621,12 +748,57 @@ class HedgeFundAI:
         try:
             # Position sizing based on volatility
             volatility = data['ATR'].iloc[-1] / current_price if 'ATR' in data and len(data) > 0 else 0.02
-            max_position = min(self.risk_limits['max_position_size'], 0.02 / volatility)
+            risk_limits = getattr(self, 'risk_limits', {'max_position_size': 0.2})
+            max_position = min(risk_limits.get('max_position_size', 0.2), 0.02 / volatility)
+            
+            # Set default parameters if they don't exist
+            if 'parameters' not in recommendation:
+                recommendation['parameters'] = {}
+                
+            # Calculate entry price, stop loss, and take profit if not set
+            if 'entry_price' not in recommendation['parameters'] or not recommendation['parameters']['entry_price']:
+                recommendation['parameters']['entry_price'] = current_price
+                
+            if 'stop_loss' not in recommendation['parameters'] or not recommendation['parameters']['stop_loss']:
+                # Default stop loss based on 2x ATR
+                atr = data['ATR'].iloc[-1] if 'ATR' in data and len(data) > 0 else current_price * 0.02
+                if recommendation['action'] == 'BUY':
+                    recommendation['parameters']['stop_loss'] = current_price - (atr * 2)
+                else:
+                    recommendation['parameters']['stop_loss'] = current_price + (atr * 2)
+                    
+            if 'take_profit' not in recommendation['parameters'] or not recommendation['parameters']['take_profit']:
+                # Default take profit based on 3x ATR
+                atr = data['ATR'].iloc[-1] if 'ATR' in data and len(data) > 0 else current_price * 0.02
+                if recommendation['action'] == 'BUY':
+                    recommendation['parameters']['take_profit'] = current_price + (atr * 3)
+                else:
+                    recommendation['parameters']['take_profit'] = current_price - (atr * 3)
             
             # Update position size in parameters
-            if 'parameters' in recommendation:
-                recommendation['parameters']['position_size'] = max_position
-                recommendation['parameters']['volatility_adjusted'] = True
+            recommendation['parameters']['position_size'] = max_position
+            recommendation['parameters']['volatility_adjusted'] = True
+            
+            # Calculate risk metrics
+            stop_loss = recommendation['parameters']['stop_loss']
+            if stop_loss and current_price > 0:
+                # Calculate max loss percentage
+                if recommendation['action'] == 'BUY':
+                    max_loss_pct = (current_price - stop_loss) / current_price * 100
+                else:
+                    max_loss_pct = (stop_loss - current_price) / current_price * 100
+                
+                # Add risk assessment
+                if 'risk_assessment' not in recommendation:
+                    recommendation['risk_assessment'] = {}
+                    
+                recommendation['risk_assessment']['max_loss'] = abs(max_loss_pct)
+                
+                # Calculate portfolio risk assuming $10K account
+                position_shares = max_position / current_price * 10000
+                max_dollar_risk = position_shares * abs(current_price - stop_loss)
+                portfolio_risk_pct = (max_dollar_risk / 10000) * 100
+                recommendation['risk_assessment']['portfolio_risk'] = portfolio_risk_pct
             
             # Add risk controls
             recommendation['risk_controls'] = {
