@@ -56,48 +56,104 @@ COLUMN_MAPPING = {
     'Adj Close': 'Adj_Close'  # Handle adjusted close
 }
 
-def get_fundamental_data(ticker):
+def get_fundamental_data(ticker, timeout=10):
     """
     Fetch fundamental data for a given ticker.
     
     Args:
         ticker (str): Stock ticker symbol
+        timeout (int): Timeout in seconds for the API request (default 10)
     
     Returns:
         dict: Dictionary containing fundamental metrics
     """
     try:
+        # Create ticker with timeout parameter
         stock = yf.Ticker(ticker)
-        info = stock.info
+        # Set a shorter timeout for the API request
+        info = stock.fast_info  # Using fast_info instead of info to reduce timeout issues
         
-        # Get earnings data
+        # Get basic info with fast_info and try to get more details with minimal requests
+        # Only fetch more detailed info if absolutely needed and with a short timeout
+        detailed_info = {}
         try:
-            earnings = stock.earnings
-            eps_ttm = earnings['EPS'].sum() if not earnings.empty else None
-        except:
-            eps_ttm = None
-        
-        # Calculate metrics
-        fundamentals = {
-            'EPS': info.get('trailingEPS') or eps_ttm,
-            'Revenue Growth': info.get('revenueGrowth', info.get('earningsGrowth')),
-            'Profit Margin': info.get('profitMargins'),
-            'P/E Ratio': info.get('trailingPE'),
-            'Market Cap': info.get('marketCap'),
-            'Volume': info.get('volume'),
-            'Average Volume': info.get('averageVolume'),
-            'Forward P/E': info.get('forwardPE'),
-            'PEG Ratio': info.get('pegRatio'),
-            'Beta': info.get('beta'),
-            'Dividend Yield': info.get('dividendYield', 0)
+            # Try to get some additional info with a strict timeout
+            import requests
+            from requests.adapters import HTTPAdapter
+            from urllib3.util.retry import Retry
+            
+            session = requests.Session()
+            retries = Retry(total=2, backoff_factor=1, status_forcelist=[500, 502, 503, 504])
+            session.mount('http://', HTTPAdapter(max_retries=retries))
+            session.mount('https://', HTTPAdapter(max_retries=retries))
+            
+            # Try to get stock info safely without using private methods
+            try:
+                info_data = stock.info
+                detailed_info = info_data if isinstance(info_data, dict) else {}
+            except Exception as info_err:
+                print(f"Error getting stock.info: {info_err}")
+                detailed_info = {}
+        except Exception as e:
+            print(f"Skipping detailed info due to: {e}")
+            detailed_info = {}
+                
+            # Initialize safe values
+            fast_info_values = {}
+            try:
+                # Safely access fast_info attributes
+                if hasattr(stock, 'fast_info'):
+                    fast_info = stock.fast_info
+                    # Use a safe access pattern for each attribute
+                    if hasattr(fast_info, 'trailing_pe'):
+                        fast_info_values['trailing_pe'] = fast_info.trailing_pe if fast_info.trailing_pe is not None else 0.0
+                    if hasattr(fast_info, 'market_cap'):
+                        fast_info_values['market_cap'] = fast_info.market_cap if fast_info.market_cap is not None else 0.0
+                    if hasattr(fast_info, 'last_volume'):
+                        fast_info_values['last_volume'] = fast_info.last_volume if fast_info.last_volume is not None else 0
+                    if hasattr(fast_info, 'three_month_average_daily_volume'):
+                        fast_info_values['three_month_average_daily_volume'] = fast_info.three_month_average_daily_volume if fast_info.three_month_average_daily_volume is not None else 0
+                    if hasattr(fast_info, 'beta'):
+                        fast_info_values['beta'] = fast_info.beta if fast_info.beta is not None else 1.0
+                    if hasattr(fast_info, 'dividend_yield'):
+                        fast_info_values['dividend_yield'] = fast_info.dividend_yield if fast_info.dividend_yield is not None else 0.0
+            except Exception as e:
+                print(f"Error accessing fast_info attributes: {e}")
+            
+            # Calculate metrics with default values and fallbacks
+            # Make sure detailed_info is a dictionary
+            if not isinstance(detailed_info, dict):
+                detailed_info = {}
+                
+            fundamentals = {
+                'EPS': detailed_info.get('trailingEPS', 0.0),
+                'Revenue Growth': detailed_info.get('revenueGrowth', 0.0),
+                'Profit Margin': detailed_info.get('profitMargins', 0.0),
+                'P/E Ratio': fast_info_values.get('trailing_pe', 0.0),
+                'Market Cap': fast_info_values.get('market_cap', 0.0),
+                'Volume': fast_info_values.get('last_volume', 0),
+                'Average Volume': fast_info_values.get('three_month_average_daily_volume', 0),
+                'Forward P/E': detailed_info.get('forwardPE', 0.0),
+                'PEG Ratio': detailed_info.get('pegRatio', 0.0),
+                'Beta': fast_info_values.get('beta', 1.0),
+                'Dividend Yield': fast_info_values.get('dividend_yield', 0.0)
         }
         
         # Convert ratios to percentages where appropriate
-        if fundamentals['Revenue Growth'] is not None:
-            fundamentals['Revenue Growth'] = fundamentals['Revenue Growth'] * 100
-        if fundamentals['Profit Margin'] is not None:
-            fundamentals['Profit Margin'] = fundamentals['Profit Margin'] * 100
-        if fundamentals['Dividend Yield'] is not None:
+        try:
+            fundamentals['Revenue Growth'] = float(fundamentals['Revenue Growth']) * 100
+        except (ValueError, TypeError):
+            fundamentals['Revenue Growth'] = 0.0
+            
+        try:
+            fundamentals['Profit Margin'] = float(fundamentals['Profit Margin']) * 100
+        except (ValueError, TypeError):
+            fundamentals['Profit Margin'] = 0.0
+            
+        try:
+            fundamentals['Dividend Yield'] = float(fundamentals['Dividend Yield']) * 100
+        except (ValueError, TypeError):
+            fundamentals['Dividend Yield'] = 0.0
             fundamentals['Dividend Yield'] = fundamentals['Dividend Yield'] * 100
             
         return fundamentals

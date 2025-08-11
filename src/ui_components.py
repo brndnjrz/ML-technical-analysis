@@ -26,31 +26,75 @@ def sidebar_config(config):
     )
     analysis_type = st.sidebar.selectbox(
         "Analysis Type:",
-        ["Options Trading Strategy", "Stock Buy/Hold/Sell"]
+        ["Options Trading Strategy", "Stock Buy/Hold/Sell", "Advanced Analysis (AI Ensemble)"]
     )
     strategy_type = None
     options_strategy = None
     
     # Set strategy type for all analysis types
-    if analysis_type in ["Options Trading Strategy", "Stock Buy/Hold/Sell"]:
+    if analysis_type == "Options Trading Strategy":
+        strategy_type = st.sidebar.selectbox(
+            "Trading Timeframe:",
+            ["Short-Term (1-7 days)", "Medium-Term (1-4 weeks)", "Long-Term (1-3 months)"],
+            index=1
+        )
+        
+        # More comprehensive options strategies
+        options_category = st.sidebar.selectbox(
+            "Options Strategy Category:",
+            ["Directional", "Income", "Volatility", "AI-Selected"]
+        )
+        
+        if options_category == "Directional":
+            options_strategy = st.sidebar.selectbox(
+                f"{strategy_type} Directional Strategy:",
+                ["Long Calls/Puts", "Debit Spreads", "LEAPS Options"]
+            )
+        elif options_category == "Income":
+            options_strategy = st.sidebar.selectbox(
+                f"{strategy_type} Income Strategy:",
+                ["Credit Spreads", "Cash-Secured Puts", "Covered Calls"]
+            )
+        elif options_category == "Volatility":
+            options_strategy = st.sidebar.selectbox(
+                f"{strategy_type} Volatility Strategy:",
+                ["Iron Condor", "Butterfly Spread", "Calendar Spread"]
+            )
+        else:  # AI-Selected
+            st.sidebar.info("🤖 AI will select the optimal strategy based on current market conditions")
+            options_strategy = "AI-Selected"
+            
+        # Add strike selection method
+        if options_strategy != "AI-Selected":
+            strike_method = st.sidebar.radio(
+                "Strike Selection Method:",
+                ["Standard Deviation", "Technical Levels", "Delta-Based"]
+            )
+    elif analysis_type == "Stock Buy/Hold/Sell":
         strategy_type = st.sidebar.selectbox(
             "Trading Timeframe:",
             ["Short-Term (1-7 days)", "Long-Term (1-3 weeks)", "Custom"],
             index=1
         )
         if "Short-Term" in strategy_type:
-            options_strategy = st.sidebar.selectbox(
-                "Short-Term Strategy:",
-                ["Day Trading Calls/Puts", "Iron Condor", "Straddle/Strangle",
-                 "Butterfly Spread", "Scalping Options"]
-            )
+            options_strategy = "Day Trading"
         elif "Long-Term" in strategy_type:
-            options_strategy = st.sidebar.selectbox(
-                "Long-Term Strategy:",
-                ["Swing Trading", "Covered Calls", "Protective Puts",
-                 "Vertical Spreads", "Calendar Spreads"]
-            )
-    return ticker, start_date, end_date, interval, analysis_type, strategy_type, options_strategy
+            options_strategy = "Swing Trading"
+            
+    # Add options prioritization checkbox
+    options_priority = st.sidebar.checkbox(
+        "Prioritize Options Strategies", 
+        value=True,
+        help="When enabled, AI analysis will focus on Day Trading Calls/Puts and Iron Condor strategies"
+    )
+    
+    # Add a note about the options prioritization
+    if options_priority:
+        st.sidebar.info("ℹ️ AI will prioritize Day Trading Calls/Puts and Iron Condor strategies")
+    else:
+        st.sidebar.info("ℹ️ AI will consider Swing Trading alongside options strategies")
+        
+    return ticker, start_date, end_date, interval, analysis_type, strategy_type, options_strategy, options_priority
 
 def sidebar_indicator_selection(strategy_type, interval, data=None):
     st.sidebar.markdown("### 📈 AI-Selected Technical Indicators")

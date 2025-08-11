@@ -7,7 +7,11 @@ from src import plotter, ai_analysis, config
 from src.data_pipeline import fetch_and_process_data
 from src.prediction import get_fundamental_metrics, predict_next_day_close
 from src.pdf_utils import generate_and_display_pdf
-from src.ui_components import render_sidebar_quick_stats, sidebar_config, sidebar_indicator_selection
+from src.ui_components import (
+    render_sidebar_quick_stats, 
+    sidebar_config, 
+    sidebar_indicator_selection
+)
 from src.trading_strategies import strategies_data  # Add this import at the top
 from src.logging_config import setup_logging, set_log_level
 from src.temp_manager import temp_manager, cleanup_old_temp_files
@@ -134,7 +138,15 @@ enable_vision_analysis = st.sidebar.checkbox(
 
 # --- Modular Sidebar ---
 # Stock ticker, date range, timeframee/interval, analysis type, strategy type, technical indicators
-ticker, start_date, end_date, interval, analysis_type, strategy_type, options_strategy = sidebar_config(config)
+ticker, start_date, end_date, interval, analysis_type, strategy_type, options_strategy, options_priority = sidebar_config(config)
+
+# Store analysis type in session state for other components to access
+if 'analysis_type' not in st.session_state:
+    st.session_state['analysis_type'] = analysis_type
+else:
+    st.session_state['analysis_type'] = analysis_type
+
+# Get active indicators with unique keys
 active_indicators = sidebar_indicator_selection(strategy_type, interval)
 
 
@@ -187,18 +199,29 @@ if st.sidebar.button("🔄 Fetch & Analyze Data", type="primary"):
 # This section displays the stock data, technical indicators, and analysis results
 if "stock_data" in st.session_state:
     data = st.session_state["stock_data"]
-    levels = st.session_state["levels"]
-    options_data = st.session_state.get("options_data")
-
-    # Enhanced Support/Resistance Display
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        st.metric(
-            "Current Price",
-            f"${data['Close'].iloc[-1]:.2f}",
-            f"{((data['Close'].iloc[-1] / data['Close'].iloc[-2]) - 1) * 100:.2f}%"
-        )
+    
+    # Make sure levels is a dictionary with 'support' and 'resistance' keys
+    if "levels" in st.session_state and isinstance(st.session_state["levels"], dict):
+        levels = st.session_state["levels"]
+    else:
+        levels = {'support': [], 'resistance': []}
+        
+    options_data = st.session_state.get("options_data", {})
+    ticker_str = ticker.upper()
+    
+    # Create tabs for different types of analysis
+    tab1, tab2, tab3 = st.tabs(["📈 Technical Analysis", "🤖 AI Recommendation", "💰 Options Analyzer"])
+    
+    # --- TAB 1: TECHNICAL ANALYSIS ---
+    with tab1:
+        # Show key metrics at the top
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric(
+                "Current Price",
+                f"${data['Close'].iloc[-1]:.2f}",
+                f"{((data['Close'].iloc[-1] / data['Close'].iloc[-2]) - 1) * 100:.2f}%"
+            )
 
     with col2:
         if levels['support']:
@@ -212,8 +235,13 @@ if "stock_data" in st.session_state:
 
 
 
-
-    fundamentals = get_fundamental_metrics(ticker)
+    # Get fundamentals with better error handling
+    try:
+        with st.spinner("Fetching fundamental data..."):
+            fundamentals = get_fundamental_metrics(ticker)
+    except Exception as e:
+        st.warning(f"⚠️ Could not fetch fundamental data. Using basic metrics only.")
+        fundamentals = {}
 
     st.markdown("### 📊 Stock Metrics")
     metric_labels = [
@@ -221,10 +249,10 @@ if "stock_data" in st.session_state:
         ("IV Percentile", f"{options_data['iv_data'].get('iv_percentile', 0):.1f}%" if options_data and options_data.get("iv_data") else "N/A"),
         ("30-Day HV", f"{options_data['iv_data'].get('hv_30', 0):.1f}%" if options_data and options_data.get("iv_data") else "N/A"),
         ("VIX Level", f"{options_data['iv_data'].get('vix', 0):.1f}" if options_data and options_data.get("iv_data") else "N/A"),
-        ("EPS", fundamentals.get("EPS", "N/A")),
-        ("P/E Ratio", fundamentals.get("P/E Ratio", "N/A")),
-        ("Revenue Growth", fundamentals.get("Revenue Growth", "N/A")),
-        ("Profit Margin", fundamentals.get("Profit Margin", "N/A")),
+        ("EPS", f"{fundamentals.get('EPS', 0):.2f}" if isinstance(fundamentals.get('EPS'), (int, float)) else "N/A"),
+        ("P/E Ratio", f"{fundamentals.get('P/E Ratio', 0):.2f}" if isinstance(fundamentals.get('P/E Ratio'), (int, float)) else "N/A"),
+        ("Revenue Growth", f"{fundamentals.get('Revenue Growth', 0):.1f}%" if isinstance(fundamentals.get('Revenue Growth'), (int, float)) else "N/A"),
+        ("Profit Margin", f"{fundamentals.get('Profit Margin', 0):.1f}%" if isinstance(fundamentals.get('Profit Margin'), (int, float)) else "N/A"),
     ]
 
     cols = st.columns(4)
@@ -293,13 +321,146 @@ if "stock_data" in st.session_state:
 
     st.plotly_chart(fig, use_container_width=True, height=800)
     
-    # --- ENHANCED AI ANALYSIS ---
-    st.markdown("### 🤖 AI-Powered Strategy Analysis")
+    # --- Display interactive chart in Tab 1 ---
+    with tab1:
+        # Display interactive chart with plotly
+        try:
+            # Ensure levels is a properly formatted dictionary
+            if not isinstance(levels, dict) or not ("support" in levels and "resistance" in levels):
+                levels = {'support': [], 'resistance': []}
+                
+            fig = plotter.create_enhanced_chart(
+                data, 
+                ticker_str, 
+                interval, 
+                st.session_state["active_indicators"], 
+                levels
+            )
+        except Exception as chart_error:
+            st.error(f"Error creating chart: {str(chart_error)}")
+            # Create a simple fallback chart
+            import plotly.graph_objects as go
+            fig = go.Figure()
+            fig.add_trace(go.Candlestick(
+                x=data.index,
+                open=data['Open'],
+                high=data['High'],
+                low=data['Low'],
+                close=data['Close'],
+                name='Price'
+            ))
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Display technical indicators summary
+        st.markdown("### Technical Indicators Summary")
+        
+        # Group indicators by type
+        indicator_groups = {
+            "Trend Indicators": ["SMA", "EMA", "MACD", "ADX"],
+            "Momentum Indicators": ["RSI", "STOCH", "CCI"],
+            "Volatility Indicators": ["BBands", "ATR", "Standard Deviation"],
+            "Volume Indicators": ["OBV", "VWAP", "Volume"]
+        }
+        
+        # Create columns for indicator categories
+        ind_cols = st.columns(len(indicator_groups))
+        
+        # Display indicator values if available
+        for i, (group_name, indicators) in enumerate(indicator_groups.items()):
+            with ind_cols[i]:
+                st.markdown(f"**{group_name}**")
+                for ind in indicators:
+                    for col in data.columns:
+                        if ind in col:
+                            try:
+                                value = data[col].iloc[-1]
+                                if isinstance(value, (int, float)):
+                                    st.metric(col, f"{value:.2f}")
+                            except:
+                                pass
     
-    analysis_cols = st.columns([1])  # Changed from [2, 1] to just [1]
-    
-    with analysis_cols[0]:
-        run_analysis = st.button("Run Analysis 💸", type="primary", use_container_width=True)
+    # --- TAB 2: AI ANALYSIS ---
+    with tab2:
+        st.markdown("### 🤖 AI-Powered Strategy Analysis")
+        
+        # Check if we already have analysis results
+        if "ai_analysis_result" in st.session_state:
+            analysis, chart_path, recommendation = st.session_state["ai_analysis_result"]
+            
+            # Convert the analysis to a nicely formatted version for display
+            formatted_analysis = format_analysis_text(analysis)
+            
+            # Display headline recommendation
+            if recommendation and 'action' in recommendation:
+                action = recommendation['action']
+                confidence = recommendation.get('confidence', 0) * 100
+                strategy_name = recommendation.get('strategy', {}).get('name', 'N/A')
+                
+                if action == 'BUY':
+                    action_color = "🟢"
+                    action_style = "success"
+                elif action == 'SELL':
+                    action_color = "🔴"
+                    action_style = "error"
+                else:
+                    action_color = "🟡"
+                    action_style = "info"
+                
+                st.markdown(f"""
+                <div style="
+                    background: linear-gradient(90deg, #f0f2f6 0%, #ffffff 100%);
+                    padding: 20px;
+                    border-radius: 10px;
+                    border-left: 5px solid #1f77b4;
+                    margin: 10px 0;
+                ">
+                    <h4 style="margin: 0; color: #1f77b4;">📋 Analysis Summary</h4>
+                    <p style="margin: 5px 0; font-size: 18px;">
+                        <strong>Recommendation:</strong> {action_color} <strong>{action}</strong> 
+                        | <strong>Strategy:</strong> {strategy_name} 
+                        | <strong>Confidence:</strong> {confidence:.0f}%
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Display the full analysis
+                st.markdown(formatted_analysis)
+        else:
+            # No analysis yet, show the Run Analysis button
+            analysis_cols = st.columns([1])
+            
+            with analysis_cols[0]:
+                run_analysis = st.button("Run Analysis 💸", type="primary", use_container_width=True)
+                if run_analysis:
+                    st.session_state['run_analysis'] = True
+            
+    # --- TAB 3: OPTIONS ANALYZER ---
+    with tab3:
+        if analysis_type == "Options Trading Strategy":
+            try:
+                # Import and use our options analyzer component
+                from src.ui_components.options_analyzer import display_options_analyzer
+                
+                # Display options analyzer component
+                display_options_analyzer(ticker_str, data, options_data.get(ticker_str, {}))
+            except ImportError as e:
+                st.error(f"Error loading Options Analyzer: {str(e)}")
+                st.info("Please ensure the options analyzer component is properly installed.")
+        else:
+            st.info("Select 'Options Trading Strategy' in the sidebar to use the Options Analyzer.")
+            
+            # Show a quick options trading overview
+            st.subheader("Options Trading Overview")
+            st.markdown("""
+            Options trading provides flexible strategies for various market conditions:
+            
+            - **Bullish strategies**: Long calls, bull call spreads, bull put spreads
+            - **Bearish strategies**: Long puts, bear put spreads, bear call spreads
+            - **Neutral strategies**: Iron condors, butterflies, calendar spreads
+            - **Volatility strategies**: Straddles, strangles
+            
+            Switch to 'Options Trading Strategy' in the sidebar to access the full Options Analyzer.
+            """)
 
     # Build enhanced prompt with strategy-specific focus
     market_context = f"""
@@ -428,7 +589,7 @@ if "stock_data" in st.session_state:
 
     # Run AI analysis synchronously (for simplicity)
 
-    if run_analysis:
+    if st.session_state.get('run_analysis', False):
         # Create progress indicators
         progress_bar = st.progress(0)
         status_text = st.empty()
@@ -523,7 +684,8 @@ PRICE CHANGE: ${price_change:.2f} ({(price_change/data['Close'].iloc[-1]*100):.1
                     data=data,
                     ticker=ticker,
                     prompt=prompt,
-                    vision_timeout=adjusted_timeout
+                    vision_timeout=adjusted_timeout,
+                    options_priority=options_priority
                 )
                 
                 # Step 4: Complete Analysis (100%)
@@ -534,12 +696,16 @@ PRICE CHANGE: ${price_change:.2f} ({(price_change/data['Close'].iloc[-1]*100):.1
                 print("="*60 + "\n")
                 
                 st.session_state["ai_analysis_result"] = (analysis, chart_path, recommendation)
+                # Reset the run_analysis flag to prevent re-running on page refresh
+                st.session_state['run_analysis'] = False
             except Exception as e:
                 status_text.text("❌ Analysis failed")
                 progress_bar.progress(0)
                 st.error(f"AI analysis failed: {e}")
                 import traceback
                 traceback.print_exc()
+                # Reset the run_analysis flag even if there was an error
+                st.session_state['run_analysis'] = False
             finally:
                 # Clear progress indicators after a short delay
                 import time

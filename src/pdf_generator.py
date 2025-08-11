@@ -126,13 +126,17 @@ class EnhancedPDF(FPDF):
         
         # Replace emojis with text equivalents
         emoji_replacements = {
-            "🤖": "[AI Analysis]",
-            "📊": "[Market Data]",
-            "💡": "[Strategy]",
-            "📈": "[Trade Parameters]",
-            "👁️": "[Visual Analysis]",
-            "⚠️": "[Risk Warning]",
-            "🔍": "[Detailed Analysis]"
+            "🤖": "AI HEDGE FUND ANALYSIS",
+            "📊": "Market Analysis",
+            "💡": "Strategy Recommendation",
+            "📈": "Trade Parameters",
+            "🎯": "Trade Parameters",
+            "👁️": "Visual Analysis",
+            "⚠️": "Risk Assessment",
+            "🔍": "Detailed Analysis",
+            "🏦": "Hedge Fund Consensus",
+            "✅": "Positive",
+            "❌": "Negative"
         }
         
         for emoji, replacement in emoji_replacements.items():
@@ -151,7 +155,13 @@ class EnhancedPDF(FPDF):
         first_line = lines[0].strip()
         
         # Format headers
-        if any(keyword in first_line for keyword in ['[AI Analysis]', '[Market Data]', '[Strategy]', '[Trade Parameters]', '[Visual Analysis]', '[Risk Warning]', '[Detailed Analysis]']):
+        header_keywords = [
+            'AI HEDGE FUND ANALYSIS', 'Market Analysis', 'Strategy Recommendation', 
+            'Trade Parameters', 'Visual Analysis', 'Risk Assessment', 'Detailed Analysis',
+            'Hedge Fund Consensus', 'AI Analysis', 'Market Data', 'Strategy'
+        ]
+        
+        if any(keyword in first_line for keyword in header_keywords):
             self.set_font("Arial", "B", 14)
             self.safe_cell(0, 12, first_line, ln=True)
             self.ln(2)
@@ -195,6 +205,17 @@ class EnhancedPDF(FPDF):
         import re
         
         try:
+            # If this is already formatted nicely, just print it as is
+            if "• " in json_text and "{" not in json_text:
+                lines = json_text.split('\n')
+                self.set_font("Arial", "", 11)
+                for line in lines:
+                    if line.strip():
+                        indent = 5 * (line.count('  ') + 1)  # Indentation based on bullet level
+                        self.cell(indent)
+                        self.safe_cell(0, 8, line.strip(), ln=True)
+                return
+            
             # Clean up the JSON text
             json_text = re.sub(r'^[^{]*{', '{', json_text)  # Remove text before {
             json_text = re.sub(r'}[^}]*$', '}', json_text)  # Remove text after }
@@ -206,28 +227,52 @@ class EnhancedPDF(FPDF):
             self.set_font("Arial", "", 11)
             
             # Format parameters in a readable way
-            for key, value in params.items():
-                formatted_key = key.replace('_', ' ').title()
-                
-                if isinstance(value, bool):
-                    formatted_value = "Yes" if value else "No"
-                elif isinstance(value, (int, float)):
-                    if 'price' in key.lower() or 'stop' in key.lower() or 'target' in key.lower():
-                        formatted_value = f"${value:.2f}"
-                    elif 'period' in key.lower():
-                        formatted_value = f"{value} periods"
-                    else:
-                        formatted_value = f"{value:.2f}"
-                else:
-                    formatted_value = str(value).replace('_', ' ').title()
-                
-                self.cell(5)  # indent
-                self.safe_cell(0, 8, f"- {formatted_key}: {formatted_value}", ln=True)
+            self._format_params_recursive(params)
                 
         except (json.JSONDecodeError, ValueError) as e:
             # Fallback to simple text if JSON parsing fails
             self.cell(5)  # indent
             self.safe_multi_cell(0, 8, f"Trade Parameters: {json_text}")
+            
+    def _format_params_recursive(self, params, indent=5, level=0):
+        """Format parameters recursively with proper indentation for nested structures."""
+        for key, value in params.items():
+            formatted_key = key.replace('_', ' ').title()
+            
+            if isinstance(value, dict):
+                # Handle nested dictionary
+                current_indent = indent + (level * 5)
+                self.cell(current_indent)
+                self.safe_cell(0, 8, f"- {formatted_key}:", ln=True)
+                self._format_params_recursive(value, indent + 5, level + 1)
+            elif isinstance(value, list):
+                # Handle list values
+                current_indent = indent + (level * 5)
+                self.cell(current_indent)
+                self.safe_cell(0, 8, f"- {formatted_key}:", ln=True)
+                for item in value:
+                    self.cell(current_indent + 5)
+                    self.safe_cell(0, 8, f"- {item}", ln=True)
+            else:
+                # Handle simple values
+                formatted_value = self._format_param_value(key, value)
+                current_indent = indent + (level * 5)
+                self.cell(current_indent)
+                self.safe_cell(0, 8, f"- {formatted_key}: {formatted_value}", ln=True)
+                
+    def _format_param_value(self, key, value):
+        """Format parameter values based on their type and key name."""
+        if isinstance(value, bool):
+            return "Yes" if value else "No"
+        elif isinstance(value, (int, float)):
+            if 'price' in key.lower() or 'stop' in key.lower() or 'target' in key.lower():
+                return f"${value:.2f}"
+            elif 'period' in key.lower():
+                return f"{value} periods"
+            else:
+                return f"{value}"
+        else:
+            return str(value).replace('_', ' ').title()
             
         self.ln(3)
 

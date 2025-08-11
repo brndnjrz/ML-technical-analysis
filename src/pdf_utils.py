@@ -26,21 +26,23 @@ def sanitize_text(text):
     
     # Replace emojis with their text equivalents first
     replacements = {
-        "🤖": "[AI Analysis]",
-        "📊": "[Market Data]",
-        "💡": "[Strategy Insight]",
-        "📈": "[Trade Parameters]",
-        "🔍": "[Detailed Analysis]",
-        "⚠️": "[Risk Warning]",
-        "✅": "[Positive Signal]",
-        "❌": "[Negative Signal]",
-        "🟢": "[Long Signal]",
-        "🔴": "[Short Signal]",
-        "🔵": "[Neutral Signal]",
-        "👁️": "[Visual Analysis]",
-        "💰": "[Profit Target]",
-        "📉": "[Bearish Signal]",
-        "📋": "[Summary]"
+        "🤖": "AI Analysis:",
+        "📊": "Market Data:",
+        "💡": "Strategy Insight:",
+        "📈": "Trade Parameters:",
+        "🔍": "Detailed Analysis:",
+        "⚠️": "Risk Warning:",
+        "✅": "Positive Signal:",
+        "❌": "Negative Signal:",
+        "🟢": "Long Signal:",
+        "🔴": "Short Signal:",
+        "🔵": "Neutral Signal:",
+        "👁️": "Visual Analysis:",
+        "💰": "Profit Target:",
+        "📉": "Bearish Signal:",
+        "📋": "Summary:",
+        "🏦": "Hedge Fund Consensus:",
+        "🎯": "Trade Parameters:"
     }
     
     for emoji, replacement in replacements.items():
