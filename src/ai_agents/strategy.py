@@ -2,6 +2,7 @@ import pandas as pd
 from typing import Dict, Any
 import numpy as np
 import logging
+from ..trading_strategies import strategies_data
 
 # Setup logger
 logger = logging.getLogger(__name__)
@@ -14,6 +15,9 @@ class StrategyAgent:
     
     def __init__(self, config: Dict[str, Any] = None):
         self.config = config or {}
+        # Load trading strategies data for intelligent strategy selection
+        self.strategies_db = {strategy['Strategy']: strategy for strategy in strategies_data}
+        self.available_strategies = list(self.strategies_db.keys())
         
     def develop_strategy(self, analysis: Dict[str, Any], data: pd.DataFrame) -> Dict[str, Any]:
         logger.debug("💡 Developing trading strategy")
@@ -87,8 +91,208 @@ class StrategyAgent:
         }
         
         try:
-            # Strategy selection logic based on market conditions
-            if conditions['trend']['direction'] == 'bullish' and conditions['momentum']['macd_signal'] == 'bullish':
+            # Enhanced strategy selection using trading_strategies.py data
+            selected_strategy_info = self._match_strategy_to_conditions(conditions, data)
+            
+            if selected_strategy_info:
+                strategy_data = self.strategies_db[selected_strategy_info['name']]
+                
+                strategy.update({
+                    'name': selected_strategy_info['name'],
+                    'type': selected_strategy_info['type'],
+                    'description': strategy_data['Description'],
+                    'timeframe': strategy_data['Timeframe'],
+                    'pros': strategy_data['Pros'],
+                    'cons': strategy_data['Cons'],
+                    'when_to_use': strategy_data['When to Use'],
+                    'suitable_for': strategy_data['Suitable For'],
+                    'parameters': self._extract_strategy_parameters(strategy_data, conditions),
+                    'confidence': selected_strategy_info['confidence']
+                })
+            else:
+                # Fallback to original logic
+                strategy = self._fallback_strategy_selection(conditions, data)
+                
+        except Exception as e:
+            print(f"Error selecting strategy: {str(e)}")
+            strategy = self._fallback_strategy_selection(conditions, data)
+            
+        return strategy
+    
+    def _match_strategy_to_conditions(self, conditions: Dict[str, Any], data: pd.DataFrame) -> Dict[str, Any]:
+        """Match current market conditions to appropriate trading strategies."""
+        strategy_matches = []
+        
+        try:
+            # Calculate market volatility
+            returns = data['Close'].pct_change().dropna()
+            volatility = returns.std() * np.sqrt(252)  # Annualized volatility
+            
+            # Get trend strength
+            trend_direction = conditions.get('trend', {}).get('direction', 'neutral')
+            trend_strength = conditions.get('trend', {}).get('strength', 'weak')
+            momentum_condition = conditions.get('momentum', {}).get('rsi_condition', 'neutral')
+            volume_trend = conditions.get('volume', 'normal')
+            
+            # Strategy matching logic based on market conditions
+            if volatility > 0.3 and momentum_condition in ['overbought', 'oversold']:
+                # High volatility with extreme momentum - good for straddle/strangle
+                strategy_matches.append({
+                    'name': 'Straddle/Strangle',
+                    'type': 'both',
+                    'confidence': 0.85,
+                    'reason': 'High volatility with extreme momentum levels'
+                })
+            
+            if trend_direction in ['bullish', 'bearish'] and trend_strength == 'strong':
+                if volume_trend == 'above_average':
+                    # Strong trend with volume confirmation - good for trend following
+                    if len(data) <= 50:  # Short-term data
+                        strategy_matches.append({
+                            'name': 'Day Trading Calls/Puts',
+                            'type': 'long' if trend_direction == 'bullish' else 'short',
+                            'confidence': 0.8,
+                            'reason': 'Strong trend with volume confirmation in short timeframe'
+                        })
+                    else:  # Longer-term data
+                        strategy_matches.append({
+                            'name': 'Swing Trading',
+                            'type': 'long' if trend_direction == 'bullish' else 'short',
+                            'confidence': 0.75,
+                            'reason': 'Strong trend suitable for swing trading'
+                        })
+            
+            if volatility < 0.15 and momentum_condition == 'neutral':
+                # Low volatility, neutral momentum - good for range strategies
+                strategy_matches.append({
+                    'name': 'Iron Condor',
+                    'type': 'neutral',
+                    'confidence': 0.7,
+                    'reason': 'Low volatility environment suitable for premium selling'
+                })
+                
+                strategy_matches.append({
+                    'name': 'Butterfly Spread',
+                    'type': 'neutral',
+                    'confidence': 0.65,
+                    'reason': 'Stable market conditions for range-bound strategy'
+                })
+            
+            if trend_direction == 'bullish' and data['Close'].iloc[-1] > data.get('SMA_50', data['Close']).iloc[-1]:
+                # Bullish trend above major moving average
+                strategy_matches.append({
+                    'name': 'Covered Calls',
+                    'type': 'long',
+                    'confidence': 0.7,
+                    'reason': 'Bullish trend suitable for income generation'
+                })
+            
+            if volatility > 0.25:
+                # Higher volatility - protective strategies
+                strategy_matches.append({
+                    'name': 'Protective Puts',
+                    'type': 'protective',
+                    'confidence': 0.6,
+                    'reason': 'High volatility warrants portfolio protection'
+                })
+            
+            # Return the highest confidence match
+            if strategy_matches:
+                return max(strategy_matches, key=lambda x: x['confidence'])
+            
+        except Exception as e:
+            print(f"Error matching strategy to conditions: {str(e)}")
+        
+        return None
+    
+    def _extract_strategy_parameters(self, strategy_data: Dict[str, Any], conditions: Dict[str, Any]) -> Dict[str, Any]:
+        """Extract and customize strategy parameters based on market conditions."""
+        parameters = {}
+        
+        try:
+            strategy_name = strategy_data['Strategy']
+            
+            # Base parameters from strategy timeframe
+            timeframe_info = strategy_data.get('Timeframe Used With', '')
+            if 'days' in timeframe_info.lower() or 'weeks' in timeframe_info.lower():
+                parameters['holding_period'] = 'medium_term'
+            elif 'minutes' in timeframe_info.lower() or 'hours' in timeframe_info.lower():
+                parameters['holding_period'] = 'short_term'
+            else:
+                parameters['holding_period'] = 'flexible'
+            
+            # Strategy-specific parameters
+            if strategy_name == 'Day Trading Calls/Puts':
+                parameters.update({
+                    'entry_condition': 'momentum_breakout',
+                    'exit_condition': 'same_day_close',
+                    'stop_loss': 'tight_atr_based',
+                    'profit_target': 'quick_scalp',
+                    'max_holding_time': '6_hours'
+                })
+            
+            elif strategy_name == 'Iron Condor':
+                parameters.update({
+                    'entry_condition': 'high_iv_rank',
+                    'exit_condition': 'profit_target_or_time',
+                    'strike_selection': 'otm_balanced',
+                    'profit_target': '25_percent_max_profit',
+                    'time_decay_benefit': True
+                })
+            
+            elif strategy_name == 'Straddle/Strangle':
+                parameters.update({
+                    'entry_condition': 'volatility_expansion_expected',
+                    'exit_condition': 'volatility_crush_or_profit',
+                    'strike_selection': 'atm_or_otm',
+                    'profit_target': 'volatility_based',
+                    'time_decay_risk': True
+                })
+            
+            elif strategy_name == 'Swing Trading':
+                parameters.update({
+                    'entry_condition': 'trend_continuation',
+                    'exit_condition': 'trend_reversal_or_target',
+                    'stop_loss': 'swing_low_high',
+                    'profit_target': 'resistance_support_levels',
+                    'trailing_stop': True
+                })
+            
+            elif strategy_name == 'Covered Calls':
+                parameters.update({
+                    'entry_condition': 'own_underlying_stock',
+                    'exit_condition': 'expiration_or_buyback',
+                    'strike_selection': 'otm_above_resistance',
+                    'income_strategy': True,
+                    'assignment_risk': True
+                })
+            
+            # Add market condition adjustments
+            if conditions.get('volatility') == 'high':
+                parameters['position_size_adjustment'] = 'reduce_size'
+                parameters['risk_management'] = 'enhanced'
+            
+            if conditions.get('trend', {}).get('strength') == 'strong':
+                parameters['confidence_boost'] = True
+                parameters['trend_following_bias'] = True
+                
+        except Exception as e:
+            print(f"Error extracting strategy parameters: {str(e)}")
+        
+        return parameters
+    
+    def _fallback_strategy_selection(self, conditions: Dict[str, Any], data: pd.DataFrame) -> Dict[str, Any]:
+        """Fallback to original strategy selection logic."""
+        strategy = {
+            'name': None,
+            'type': None,
+            'parameters': {},
+            'confidence': 0.0
+        }
+        
+        try:
+            # Original strategy selection logic
+            if conditions.get('trend', {}).get('direction') == 'bullish' and conditions.get('momentum', {}).get('macd_signal') == 'bullish':
                 strategy.update({
                     'name': 'Trend Following',
                     'type': 'long',
@@ -99,7 +303,7 @@ class StrategyAgent:
                     },
                     'confidence': 0.8
                 })
-            elif conditions['trend']['direction'] == 'bearish' and conditions['momentum']['macd_signal'] == 'bearish':
+            elif conditions.get('trend', {}).get('direction') == 'bearish' and conditions.get('momentum', {}).get('macd_signal') == 'bearish':
                 strategy.update({
                     'name': 'Trend Following',
                     'type': 'short',
@@ -110,7 +314,7 @@ class StrategyAgent:
                     },
                     'confidence': 0.8
                 })
-            elif conditions['volatility'] == 'high':
+            elif conditions.get('volatility') == 'high':
                 strategy.update({
                     'name': 'Mean Reversion',
                     'type': 'both',
@@ -134,7 +338,7 @@ class StrategyAgent:
                 })
                 
         except Exception as e:
-            print(f"Error selecting strategy: {str(e)}")
+            print(f"Error in fallback strategy selection: {str(e)}")
             
         return strategy
     

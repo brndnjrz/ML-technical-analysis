@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from typing import Dict, Any, List
 import logging
+from ..trading_strategies import strategies_data
 
 # Setup logger
 logger = logging.getLogger(__name__)
@@ -14,6 +15,8 @@ class AnalystAgent:
     
     def __init__(self, config: Dict[str, Any] = None):
         self.config = config or {}
+        # Load strategies for context-aware analysis
+        self.strategies_db = {strategy['Strategy']: strategy for strategy in strategies_data}
     
     def analyze_technical_indicators(self, data: pd.DataFrame) -> Dict[str, Any]:
         logger.debug("📈 Analyzing technical indicators")
@@ -170,18 +173,129 @@ class AnalystAgent:
         return volatility_analysis
     
     def _identify_patterns(self, data: pd.DataFrame) -> List[Dict[str, Any]]:
-        """Identify common chart patterns."""
+        """Identify common chart patterns relevant to trading strategies."""
         patterns = []
         try:
-            # Example pattern: Double Bottom
-            patterns.extend(self._find_double_bottom(data))
+            # Strategy-aware pattern recognition
+            patterns.extend(self._find_volatility_patterns(data))  # For Straddle/Strangle strategies
+            patterns.extend(self._find_trend_patterns(data))       # For Swing Trading, Day Trading
+            patterns.extend(self._find_range_patterns(data))       # For Iron Condor, Butterfly
+            patterns.extend(self._find_breakout_patterns(data))    # For momentum strategies
             
-            # Example pattern: Double Top
+            # Original patterns
+            patterns.extend(self._find_double_bottom(data))
             patterns.extend(self._find_double_top(data))
             
         except Exception as e:
             print(f"Error in pattern identification: {str(e)}")
             
+        return patterns
+    
+    def _find_volatility_patterns(self, data: pd.DataFrame) -> List[Dict[str, Any]]:
+        """Identify volatility patterns relevant for Straddle/Strangle strategies."""
+        patterns = []
+        try:
+            # Calculate volatility compression/expansion
+            if 'ATR' in data.columns:
+                atr = data['ATR']
+                atr_ma = atr.rolling(20).mean()
+                current_atr = atr.iloc[-1]
+                avg_atr = atr_ma.iloc[-1]
+                
+                if current_atr < avg_atr * 0.7:  # Volatility compression
+                    patterns.append({
+                        'pattern': 'Volatility Compression',
+                        'strategy_relevance': ['Straddle/Strangle', 'Calendar Spreads'],
+                        'description': 'Low volatility may precede expansion',
+                        'confidence': 0.7,
+                        'time_horizon': 'short_term'
+                    })
+                elif current_atr > avg_atr * 1.3:  # Volatility expansion
+                    patterns.append({
+                        'pattern': 'Volatility Expansion',
+                        'strategy_relevance': ['Protective Puts', 'Day Trading Calls/Puts'],
+                        'description': 'High volatility environment detected',
+                        'confidence': 0.8,
+                        'time_horizon': 'immediate'
+                    })
+        except Exception as e:
+            print(f"Error finding volatility patterns: {str(e)}")
+        return patterns
+    
+    def _find_trend_patterns(self, data: pd.DataFrame) -> List[Dict[str, Any]]:
+        """Identify trend patterns relevant for trend-following strategies."""
+        patterns = []
+        try:
+            # Moving average alignment
+            if all(col in data.columns for col in ['EMA_20', 'EMA_50']):
+                ema_20 = data['EMA_20'].iloc[-1]
+                ema_50 = data['EMA_50'].iloc[-1]
+                current_price = data['Close'].iloc[-1]
+                
+                if current_price > ema_20 > ema_50:  # Bullish alignment
+                    patterns.append({
+                        'pattern': 'Bullish Trend Alignment',
+                        'strategy_relevance': ['Swing Trading', 'Covered Calls', 'Day Trading Calls/Puts'],
+                        'description': 'Price above both EMAs with bullish alignment',
+                        'confidence': 0.8,
+                        'time_horizon': 'medium_term'
+                    })
+                elif current_price < ema_20 < ema_50:  # Bearish alignment
+                    patterns.append({
+                        'pattern': 'Bearish Trend Alignment',
+                        'strategy_relevance': ['Swing Trading', 'Protective Puts', 'Day Trading Calls/Puts'],
+                        'description': 'Price below both EMAs with bearish alignment',
+                        'confidence': 0.8,
+                        'time_horizon': 'medium_term'
+                    })
+        except Exception as e:
+            print(f"Error finding trend patterns: {str(e)}")
+        return patterns
+    
+    def _find_range_patterns(self, data: pd.DataFrame) -> List[Dict[str, Any]]:
+        """Identify range-bound patterns relevant for neutral strategies."""
+        patterns = []
+        try:
+            # Check for sideways movement
+            if 'High' in data.columns and 'Low' in data.columns:
+                recent_highs = data['High'].rolling(20).max()
+                recent_lows = data['Low'].rolling(20).min()
+                current_range = recent_highs.iloc[-1] - recent_lows.iloc[-1]
+                avg_range = (recent_highs.rolling(5).std() + recent_lows.rolling(5).std()).iloc[-1]
+                
+                if avg_range < current_range * 0.3:  # Low range variance = consolidation
+                    patterns.append({
+                        'pattern': 'Range-Bound Consolidation',
+                        'strategy_relevance': ['Iron Condor', 'Butterfly Spread', 'Calendar Spreads'],
+                        'description': 'Price consolidating in tight range',
+                        'confidence': 0.75,
+                        'time_horizon': 'short_to_medium_term'
+                    })
+        except Exception as e:
+            print(f"Error finding range patterns: {str(e)}")
+        return patterns
+    
+    def _find_breakout_patterns(self, data: pd.DataFrame) -> List[Dict[str, Any]]:
+        """Identify potential breakout patterns for momentum strategies."""
+        patterns = []
+        try:
+            # Volume and price breakout detection
+            if 'Volume' in data.columns and 'High' in data.columns:
+                recent_high = data['High'].rolling(20).max().iloc[-2]  # Previous 20-day high
+                current_price = data['Close'].iloc[-1]
+                current_volume = data['Volume'].iloc[-1]
+                avg_volume = data['Volume'].rolling(20).mean().iloc[-1]
+                
+                if current_price > recent_high and current_volume > avg_volume * 1.5:
+                    patterns.append({
+                        'pattern': 'Bullish Breakout with Volume',
+                        'strategy_relevance': ['Day Trading Calls/Puts', 'Swing Trading'],
+                        'description': 'Price breaking above resistance with high volume',
+                        'confidence': 0.85,
+                        'time_horizon': 'immediate_to_short_term'
+                    })
+        except Exception as e:
+            print(f"Error finding breakout patterns: {str(e)}")
         return patterns
     
     def _find_double_bottom(self, data: pd.DataFrame) -> List[Dict[str, Any]]:

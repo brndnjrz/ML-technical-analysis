@@ -64,7 +64,10 @@ def format_analysis_text(text):
                     else:
                         formatted_value = f"{value:.2f}"
                 else:
-                    formatted_value = str(value).replace('_', ' ').title()
+                    if value is not None:
+                        formatted_value = str(value).replace('_', ' ').title()
+                    else:
+                        formatted_value = "Not specified"
                 
                 formatted_lines.append(f"- **{formatted_key}:** {formatted_value}")
             
@@ -112,13 +115,13 @@ st.sidebar.markdown("### 👁️ Vision Analysis Settings")
 vision_timeout = st.sidebar.slider(
     "Vision Analysis Timeout (seconds)",
     min_value=30,
-    max_value=3000,
+    max_value=5000,
     value=90,
     step=30,
     help="Adjust timeout for AI vision analysis. Increase if you experience frequent timeouts."
 )
 
-if vision_timeout > 1000:
+if vision_timeout > 2000:
     st.sidebar.warning("⚠️ Long timeouts may slow down analysis")
 elif vision_timeout < 60:
     st.sidebar.info("ℹ️ Short timeouts may cause analysis failures")
@@ -640,8 +643,10 @@ PRICE CHANGE: ${price_change:.2f} ({(price_change/data['Close'].iloc[-1]*100):.1
             param_col1, param_col2 = st.columns(2)
             
             with param_col1:
-                if 'entry_condition' in params:
+                if 'entry_condition' in params and params['entry_condition'] is not None:
                     st.info(f"**Entry Condition:** {params['entry_condition'].replace('_', ' ').title()}")
+                elif 'entry_condition' in params:
+                    st.info("**Entry Condition:** Not specified")
                 if 'stop_loss' in params:
                     try:
                         stop_loss_val = float(params['stop_loss'])
@@ -650,8 +655,10 @@ PRICE CHANGE: ${price_change:.2f} ({(price_change/data['Close'].iloc[-1]*100):.1
                         st.error(f"**Stop Loss:** {params['stop_loss']}")
                         
             with param_col2:
-                if 'exit_condition' in params:
+                if 'exit_condition' in params and params['exit_condition'] is not None:
                     st.info(f"**Exit Condition:** {params['exit_condition'].replace('_', ' ').title()}")
+                elif 'exit_condition' in params:
+                    st.info("**Exit Condition:** Not specified")
                 if 'profit_target' in params:
                     try:
                         profit_val = float(params['profit_target'])
@@ -675,7 +682,10 @@ PRICE CHANGE: ${price_change:.2f} ({(price_change/data['Close'].iloc[-1]*100):.1
                         else:
                             value_display = f"{value:.2f}"
                     else:
-                        value_display = str(value).replace('_', ' ').title()
+                        if value is not None:
+                            value_display = str(value).replace('_', ' ').title()
+                        else:
+                            value_display = "Not specified"
                     
                     st.write(f"• **{formatted_key}:** {value_display}")
         

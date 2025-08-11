@@ -20,6 +20,7 @@ def format_recommendation_summary(recommendation: dict) -> str:
         strategy = recommendation.get('strategy', {})
         signals = recommendation.get('signals', {})
         risk = recommendation.get('risk_assessment', {})
+        consensus = recommendation.get('consensus_details', {})
         
         # Safe formatting with None checks
         def safe_format(value, format_type='str', default='N/A'):
@@ -37,9 +38,26 @@ def format_recommendation_summary(recommendation: dict) -> str:
             except (ValueError, TypeError):
                 return default
         
+        # Build consensus information section
+        consensus_section = ""
+        if consensus:
+            agreement_score = consensus.get('agreement_score', 0)
+            consensus_reached = consensus.get('consensus_reached', False)
+            status_icon = "✅" if consensus_reached else "⚠️"
+            
+            consensus_section = f"""
+🏦 Hedge Fund Consensus:
+   • Agreement Score: {agreement_score:.1%}
+   • Status: {status_icon} {'CONSENSUS REACHED' if consensus_reached else 'CONFLICTS RESOLVED'}
+   • Committee Decision: {consensus.get('final_decision', 'HOLD').upper()}"""
+            
+            if not consensus_reached and consensus.get('conflicts'):
+                consensus_section += f"\\n   • Conflicts Addressed: {len(consensus.get('conflicts', []))} strategy disagreements"
+        
         summary = f"""
-🤖 AI ANALYSIS SUMMARY
-{'='*50}
+🤖 AI HEDGE FUND ANALYSIS SUMMARY
+{'='*50}{consensus_section}
+
 📊 Market Analysis:
    • RSI: {safe_format(market.get('RSI'), 'float', '0.0')} ({safe_format(market.get('momentum', {}).get('rsi', {}).get('condition'))})
    • MACD: {safe_format(market.get('MACD_Signal'))} trend
@@ -67,7 +85,7 @@ def format_recommendation_summary(recommendation: dict) -> str:
     except Exception as e:
         logger.error(f"Error formatting recommendation: {e}")
         return f"""
-🤖 AI ANALYSIS SUMMARY
+🤖 AI HEDGE FUND ANALYSIS SUMMARY
 {'='*50}
 ❌ Error generating recommendation summary
    • Raw data available but formatting failed
@@ -85,15 +103,33 @@ def run_ai_analysis(fig, data: pd.DataFrame, ticker: str, prompt: str, vision_ti
         vision_timeout: Timeout for vision analysis in seconds (default: 120)
     """
     
-    print("🤖 AI ANALYSIS STARTING")
+    print("🤖 AI HEDGE FUND ANALYSIS STARTING")
     print("=" * 50)
     
-    # 1. Get AI Agents Analysis
-    print("📊 Analyzing market conditions...")
+    # 1. Get AI Hedge Fund Consensus Analysis
+    print("🏦 Running Hedge Fund AI Analysis...")
+    print("   • Analyst Agent: Market condition assessment")
+    print("   • Strategy Agent: Trade strategy evaluation") 
+    print("   • Execution Agent: Risk and timing analysis")
+    print("   • Building investment committee consensus...")
+    
     ai_system = HedgeFundAI()
     current_price = data['Close'].iloc[-1]
     
     recommendation = ai_system.analyze_and_recommend(data, ticker, current_price)
+    
+    # Show consensus details if available
+    if 'consensus_details' in recommendation:
+        consensus = recommendation['consensus_details']
+        print(f"\n📋 CONSENSUS BUILDING RESULTS:")
+        print(f"   • Agreement Score: {consensus.get('agreement_score', 0):.1%}")
+        print(f"   • Consensus Threshold: {consensus.get('threshold', 0.6):.0%}")
+        print(f"   • Decision Status: {'✅ CONSENSUS REACHED' if consensus.get('consensus_reached', False) else '⚠️ CONFLICT DETECTED'}")
+        
+        if not consensus.get('consensus_reached', False):
+            conflicts = consensus.get('conflicts', [])
+            if conflicts:
+                print(f"   • Conflicts Resolved: {len(conflicts)} strategy conflicts addressed")
     
     # Log formatted summary instead of raw JSON
     summary = format_recommendation_summary(recommendation)
