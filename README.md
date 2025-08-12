@@ -75,7 +75,7 @@ The following foundational features provide the backbone of the analysis system:
 
 #### 🔮 **Enhanced Machine Learning Predictions** (Maintained)
 
-- **Improved Model Selection**: Enhanced RandomForest, XGBoost, and CatBoost implementations
+- **Ensemble Model Approach**: Automatic combination of RandomForest, XGBoost, and CatBoost for better predictions
 - **Advanced Feature Engineering**: Strategy-specific feature combinations for different trading approaches
 - **Robust Error Handling**: Fixed NoneType arithmetic operations and pandas future warnings
 - **Data Validation**: Comprehensive validation with minimum data requirements (20+ rows)
@@ -95,7 +95,7 @@ The following foundational features provide the backbone of the analysis system:
 
 #### 🔮 **Enhanced Machine Learning Predictions**
 
-- **Improved Model Selection**: Enhanced RandomForest, XGBoost, and CatBoost implementations
+- **Ensemble Model Approach**: Automatic combination of RandomForest, XGBoost, and CatBoost for better predictions
 - **Advanced Feature Engineering**: Strategy-specific feature combinations for different trading approaches
 - **Robust Error Handling**: Fixed NoneType arithmetic operations and pandas future warnings
 - **Data Validation**: Comprehensive validation with minimum data requirements (20+ rows)
@@ -218,7 +218,7 @@ The following foundational features provide the backbone of the analysis system:
 
 ### **1. Streamlit App Setup & UI**
 - Modern, wide-layout dashboard with streamlined controls
-- Sidebar features model selection and strategy configuration
+- Sidebar features intelligent configuration options with AI-driven defaults
 - Real-time data fetching enabled by default
 - Dynamic indicator selection based on strategy type
 

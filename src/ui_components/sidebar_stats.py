@@ -15,7 +15,7 @@ def render_sidebar_quick_stats(data: pd.DataFrame, interval: str):
     
     Args:
         data: DataFrame with price data
-        interval: Time interval of the data (e.g., "1d", "1wk")
+        interval: Time interval of the data (e.g., "5m", "15m", "30m", "1h", "1d")
     """
     # Display quick price stats in sidebar
     st.sidebar.markdown("### 📊 Quick Stats")

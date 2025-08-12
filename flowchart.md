@@ -1,7 +1,7 @@
 ```mermaid
 flowchart TD
     %% USER & UI FLOW
-    A([User opens dashboard]):::start --> B[Sidebar: Select ticker, date range, interval, analysis type, strategy, indicators, model]
+    A([User opens dashboard]):::start --> B[Sidebar: Select ticker, date range, interval, analysis type, strategy, indicators]
     B --> B1[Options Prioritization Toggle]:::new
     B1 --> C([User clicks 'Fetch & Analyze Data'])
     C --> D[fetch_and_process_data<br/>Load price, options, indicators]

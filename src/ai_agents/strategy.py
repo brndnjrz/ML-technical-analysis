@@ -23,8 +23,11 @@ class StrategyAgent:
         logger.debug("💡 Developing trading strategy")
         strategy = {}
         try:
+            # Get current price
+            current_price = data['Close'].iloc[-1] if not data.empty and 'Close' in data.columns else None
+            
             # Analyze market conditions
-            market_conditions = self._analyze_market_conditions(analysis)
+            market_conditions = self._analyze_market_conditions(analysis, current_price)
             
             # Enhance conditions with options-specific information if available
             if options_data and options_priority:
@@ -101,13 +104,16 @@ class StrategyAgent:
             
         return conditions
     
-    def _analyze_market_conditions(self, analysis: Dict[str, Any]) -> Dict[str, Any]:
+    def _analyze_market_conditions(self, analysis: Dict[str, Any], current_price=None) -> Dict[str, Any]:
         """Analyze current market conditions to determine suitable strategies."""
         conditions = {
             'trend': None,
             'volatility': None,
             'momentum': None,
-            'volume': None
+            'volume': None,
+            'price_data': {
+                'current_price': current_price
+            }
         }
         
         try:
@@ -289,15 +295,22 @@ class StrategyAgent:
             else:
                 parameters['holding_period'] = 'flexible'
             
-            # Enhance parameters with comprehensive strike selection when applicable
-            current_price = self.data['Close'].iloc[-1] if 'Close' in self.data.columns else None
+            # Get price data from conditions instead of self.data
+            price_data = conditions.get('price_data', {})
+            current_price = price_data.get('current_price')
             
             # If we have price data and this is an options strategy, add comprehensive strike selection
             if current_price is not None and strategy_name in [
                 'Day Trading Calls/Puts', 'Iron Condor', 'Straddle/Strangle', 
                 'Covered Calls', 'Credit Spreads', 'Calendar Spreads'
             ]:
-                strike_info = self._get_comprehensive_strike_selection(self.data, strategy_name, current_price)
+                # We'll use a default approach since we don't have data here
+                # Just calculate some common strike distances
+                strike_info = {
+                    'atm_strike': round(current_price),
+                    'itm_strike': round(current_price * 0.95),
+                    'otm_strike': round(current_price * 1.05)
+                }
                 parameters['strike_info'] = strike_info['final_recommendation']
             
             # Strategy-specific parameters
