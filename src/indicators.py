@@ -233,7 +233,7 @@ def log_calculated_indicators(df: pd.DataFrame, timeframe: str):
         logger.error(f"Error logging indicators: {str(e)}")
 
 def calculate_indicators(data: pd.DataFrame, 
-                       timeframe: str = "1d",
+                       timeframe: str = "15m",
                        strategy_type: Optional[str] = None,
                        selected_indicators: Optional[List[str]] = None) -> pd.DataFrame:
     """Calculate technical indicators for market analysis.
@@ -247,7 +247,7 @@ def calculate_indicators(data: pd.DataFrame,
     
     Args:
         data: DataFrame with OHLCV data
-        timeframe: Data timeframe (e.g., "1d", "1h")
+        timeframe: Data timeframe (e.g., "5m", "15m", "30m", "1h", "1d")
         strategy_type: Type of trading strategy
         selected_indicators: List of indicators to calculate
         
@@ -887,10 +887,31 @@ def detect_support_resistance(data: pd.DataFrame, method: str = "quick",
     supports = []
     resistances = []
 
-    window = max(window, 30) if method == "advanced" else max(window, 10)
-    if len(df) < window * 2:
-        logger.warning(f"Not enough data for support/resistance detection. Need at least {window*2} candles, got {len(df)}")
-        return {"support": [], "resistance": []}
+    # Make window size more adaptive to available data
+    if method == "advanced":
+        # For advanced method, try to use at least 30 candles
+        ideal_window = max(window, 30)
+        min_required = 40
+    else:
+        # For quick method, can work with just 10 candles
+        ideal_window = max(window, 10)
+        min_required = 20
+        
+    # Adapt to available data
+    available_data_points = len(df)
+    
+    if available_data_points < min_required:
+        # We can still try with smaller window if we have at least some data
+        if available_data_points >= 10:
+            # Adjust window to work with available data
+            window = max(3, int(available_data_points / 4))
+            logger.info(f"Adjusting support/resistance detection window to {window} due to limited data ({available_data_points} candles)")
+        else:
+            logger.warning(f"Not enough data for support/resistance detection. Need at least 10 candles, got {available_data_points}")
+            return {"support": [], "resistance": []}
+    else:
+        # We have enough data, use ideal window
+        window = ideal_window
 
     for i in range(window, len(df) - window):
         local_lows = df['Low'].iloc[i - window:i + window]
@@ -948,17 +969,29 @@ def calculate_iv_metrics(ticker: str, data: pd.DataFrame) -> Dict[str, float]:
         current_hv_10 = data['hv_10'].iloc[-1] * 100
         current_hv_63 = data['hv_63'].iloc[-1] * 100
         
-        # Calculate IV Rank (current IV position in 52-week range)
-        iv_series = data['volatility'].dropna().iloc[-252:]  # Use last ~year of data
-        min_iv = iv_series.min() * 100
-        max_iv = iv_series.max() * 100
+        # Calculate IV Rank (current IV position in available range)
+        # Safely get as much history as available (up to 1 year)
+        available_points = min(len(data['volatility'].dropna()), 252)
         
-        # Prevent division by zero
-        iv_range = max(max_iv - min_iv, 0.01)
-        iv_rank = min(max(((current_hv - min_iv) / iv_range) * 100, 0), 100)
-        
-        # Calculate IV Percentile (percentage of days with lower IV)
-        iv_percentile = (iv_series.rank(pct=True).iloc[-1]) * 100
+        if available_points < 5:  # Need at least a week of data
+            logger.info(f"Limited volatility history for {ticker}: {available_points} data points")
+            # Use simplified calculations with defaults
+            min_iv = current_hv * 0.8  # Assume 20% lower as min
+            max_iv = current_hv * 1.2  # Assume 20% higher as max
+            iv_rank = 50  # Default to middle
+            iv_percentile = 50  # Default to middle
+        else:
+            # Use whatever history we have
+            iv_series = data['volatility'].dropna().iloc[-available_points:] 
+            min_iv = iv_series.min() * 100
+            max_iv = iv_series.max() * 100
+            
+            # Prevent division by zero
+            iv_range = max(max_iv - min_iv, 0.01)
+            iv_rank = min(max(((current_hv - min_iv) / iv_range) * 100, 0), 100)
+            
+            # Calculate IV Percentile (percentage of days with lower IV)
+            iv_percentile = (iv_series.rank(pct=True).iloc[-1]) * 100
         
         # Calculate volatility term structure (contango/backwardation)
         # Contango: Short-term vol < Long-term vol (normal)
@@ -974,10 +1007,25 @@ def calculate_iv_metrics(ticker: str, data: pd.DataFrame) -> Dict[str, float]:
             
         # Volatility trend (rising or falling)
         vol_trend = "Stable"
-        recent_vol = data['volatility'].iloc[-10:].values
-        if len(recent_vol) >= 10:
+        
+        # Safely calculate volatility trend with available data
+        vol_data = data['volatility'].dropna()
+        if len(vol_data) >= 10:
+            recent_vol = vol_data.iloc[-10:].values
             first_half_avg = np.mean(recent_vol[:5])
             second_half_avg = np.mean(recent_vol[5:])
+            vol_change_pct = (second_half_avg - first_half_avg) / first_half_avg if first_half_avg > 0 else 0
+            
+            if vol_change_pct > 0.05:  # 5% increase
+                vol_trend = "Rising"
+            elif vol_change_pct < -0.05:  # 5% decrease
+                vol_trend = "Falling"
+        elif len(vol_data) >= 4:
+            # If we have limited data, use simpler calculation
+            recent_vol = vol_data.values
+            mid_point = len(recent_vol) // 2
+            first_half_avg = np.mean(recent_vol[:mid_point])
+            second_half_avg = np.mean(recent_vol[mid_point:])
             vol_change_pct = (second_half_avg - first_half_avg) / first_half_avg if first_half_avg > 0 else 0
             
             if vol_change_pct > 0.05:  # 5% increase

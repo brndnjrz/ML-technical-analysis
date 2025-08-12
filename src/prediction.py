@@ -287,8 +287,8 @@ def get_fundamental_metrics(ticker):
         st.warning(f"Could not fetch fundamentals: {e}")
         return {}
 
-def predict_next_day_close(data: pd.DataFrame, fundamentals: dict, selected_indicators: list, model_type="RandomForest") -> Tuple[float, float]:
-    """Predicts the next day's closing price using the selected model with enhanced accuracy methods."""
+def predict_next_day_close(data: pd.DataFrame, fundamentals: dict, selected_indicators: list) -> Tuple[float, float]:
+    """Predicts the next day's closing price using an ensemble of models for better accuracy."""
     try:
         # Input validation
         if data is None or data.empty:
@@ -412,21 +412,44 @@ def predict_next_day_close(data: pd.DataFrame, fundamentals: dict, selected_indi
         # Filter out string/object columns that can't be used in models
         numeric_feature_cols = []
         for col in feature_cols:
-            if df[col].dtype.kind in 'biufc':  # boolean, integer, unsigned int, float, complex
-                numeric_feature_cols.append(col)
-            elif col == 'Market_Regime':
-                # One-hot encode the Market_Regime column
-                try:
-                    logger.info(f"One-hot encoding Market_Regime: {df['Market_Regime'].unique()}")
-                    regime_dummies = pd.get_dummies(df['Market_Regime'], prefix='Regime')
-                    df = pd.concat([df, regime_dummies], axis=1)
-                    # Add the new dummy columns to features
-                    for dummy_col in regime_dummies.columns:
-                        numeric_feature_cols.append(dummy_col)
-                except Exception as e:
-                    logger.warning(f"Could not one-hot encode Market_Regime: {e}")
-            else:
-                logger.warning(f"Skipping non-numeric column: {col} with dtype {df[col].dtype}")
+            try:
+                # Check if the column is a Series and if it has a dtype property
+                if isinstance(df[col], pd.Series) and hasattr(df[col], 'dtype'):
+                    if df[col].dtype.kind in 'biufc':  # boolean, integer, unsigned int, float, complex
+                        numeric_feature_cols.append(col)
+                    elif col == 'Market_Regime':
+                        # One-hot encode the Market_Regime column
+                        try:
+                            logger.info(f"One-hot encoding Market_Regime: {df['Market_Regime'].unique()}")
+                            regime_dummies = pd.get_dummies(df['Market_Regime'], prefix='Regime')
+                            # Ensure dummy columns are properly added as Series, not DataFrames
+                            for dummy_col in regime_dummies.columns:
+                                # Check if the column already exists to avoid duplicates
+                                if dummy_col not in df.columns:
+                                    # Convert to Series explicitly
+                                    dummy_series = pd.Series(regime_dummies[dummy_col].values, 
+                                                           index=df.index, 
+                                                           name=dummy_col, 
+                                                           dtype='int64')
+                                    df[dummy_col] = dummy_series
+                                    # Verify the column is a Series before adding to features
+                                    if isinstance(df[dummy_col], pd.Series):
+                                        numeric_feature_cols.append(dummy_col)
+                                        logger.info(f"Added dummy column {dummy_col} as Series")
+                                    else:
+                                        logger.warning(f"Failed to create Series for dummy column {dummy_col}")
+                                else:
+                                    logger.info(f"Dummy column {dummy_col} already exists, skipping")
+                        except Exception as e:
+                            logger.warning(f"Could not one-hot encode Market_Regime: {e}")
+                    else:
+                        logger.warning(f"Skipping non-numeric column: {col} with dtype {df[col].dtype}")
+                else:
+                    # If it's a DataFrame or something else, handle accordingly
+                    logger.warning(f"Skipping column {col} which is not a Series: {type(df[col])}")
+            except Exception as e:
+                logger.warning(f"Error processing column {col}: {e}")
+                # Don't try to access df[col].dtype here, as it might be the source of the exception
                 
         feature_cols = numeric_feature_cols
         logger.info(f"Using {len(feature_cols)} numeric feature columns for prediction")
@@ -485,17 +508,40 @@ def predict_next_day_close(data: pd.DataFrame, fundamentals: dict, selected_indi
             
             # Double check for any non-numeric feature columns
             for col in list(feature_cols):  # Use list to make a copy before modifying
-                if df[col].dtype.kind not in 'biufc':  # boolean, integer, unsigned int, float, complex
-                    feature_cols.remove(col)
-                    logger.warning(f"Removing non-numeric column from features: {col} with dtype {df[col].dtype}")
+                try:
+                    # Check if the column is a Series and has a dtype property
+                    if isinstance(df[col], pd.Series) and hasattr(df[col], 'dtype'):
+                        if df[col].dtype.kind not in 'biufc':  # boolean, integer, unsigned int, float, complex
+                            feature_cols.remove(col)
+                            logger.warning(f"Removing non-numeric column from features: {col} with dtype {df[col].dtype}")
+                    else:
+                        # Handle DataFrame or other object types
+                        feature_cols.remove(col)
+                        logger.warning(f"Removing column that is not a Series: {col} of type {type(df[col])}")
+                except Exception as e:
+                    # If accessing dtype causes an error, remove the column
+                    if col in feature_cols:
+                        feature_cols.remove(col)
+                    logger.warning(f"Error checking column {col}: {e}, removing from features")
                     
             # Convert any remaining problematic columns to numeric
-            for col in feature_cols:
-                if df[col].dtype == 'object':
-                    logger.warning(f"Converting object column to numeric: {col}")
-                    df[col] = pd.to_numeric(df[col], errors='coerce')
-                    if df[col].isna().sum() > 0:
-                        df[col] = df[col].fillna(0)
+            for col in list(feature_cols):  # Use list to make a copy before modifying
+                try:
+                    if isinstance(df[col], pd.Series) and hasattr(df[col], 'dtype'):
+                        if df[col].dtype == 'object':
+                            logger.warning(f"Converting object column to numeric: {col}")
+                            df[col] = pd.to_numeric(df[col], errors='coerce')
+                            if df[col].isna().sum() > 0:
+                                df[col] = df[col].fillna(0)
+                    else:
+                        # If it's not a Series with a dtype, remove it
+                        feature_cols.remove(col)
+                        logger.warning(f"Removed column {col} as it's not a proper numeric Series")
+                except Exception as e:
+                    # If any error occurs while processing, remove the column
+                    if col in feature_cols:
+                        feature_cols.remove(col)
+                    logger.warning(f"Error processing column {col}: {e}, removing from features")
             
             # Ensure 'Market_Regime' is not used directly as a feature if it's a string
             if 'Market_Regime' in feature_cols:
@@ -503,6 +549,7 @@ def predict_next_day_close(data: pd.DataFrame, fundamentals: dict, selected_indi
                 logger.info("Removed 'Market_Regime' string column from features")
             
             # Create models for ensemble approach with regime-specific adjustments
+            # Always using all three models for better prediction accuracy
             models = {
                 'RandomForest': create_model("RandomForest"),
                 'XGBoost': create_model("XGBoost"),
@@ -521,15 +568,70 @@ def predict_next_day_close(data: pd.DataFrame, fundamentals: dict, selected_indi
             # This will prevent the "could not convert string to float" error
             categorical_cols = []
             for col in X_train.columns:
-                if X_train[col].dtype == 'object' or (isinstance(X_train[col].iloc[0], str) if len(X_train) > 0 else False):
+                try:
+                    # Check if column is a Series and has dtype before accessing
+                    if isinstance(X_train[col], pd.Series) and hasattr(X_train[col], 'dtype'):
+                        if X_train[col].dtype == 'object' or (isinstance(X_train[col].iloc[0], str) if len(X_train) > 0 else False):
+                            categorical_cols.append(col)
+                    else:
+                        # If not a Series with dtype, treat as categorical and remove
+                        categorical_cols.append(col)
+                        logger.warning(f"Column {col} is not a Series with dtype attribute: {type(X_train[col])}")
+                except Exception as e:
+                    # If any error occurs, add to categorical columns to be removed
                     categorical_cols.append(col)
+                    logger.warning(f"Error checking column {col}: {e}, will be removed from training data")
                     
             if categorical_cols:
+                # Remove duplicates from categorical_cols list
+                categorical_cols = list(set(categorical_cols))
                 logger.warning(f"Found categorical columns that will cause training errors: {categorical_cols}")
                 # Remove these columns from X_train and X_test
                 X_train = X_train.drop(columns=categorical_cols)
                 X_test = X_test.drop(columns=categorical_cols)
                 logger.info(f"Removed {len(categorical_cols)} problematic categorical columns from training data")
+            
+            # Handle infinite and extremely large values
+            logger.info("Checking for infinite and extremely large values...")
+            
+            # Replace infinite values with NaN first
+            X_train = X_train.replace([np.inf, -np.inf], np.nan)
+            X_test = X_test.replace([np.inf, -np.inf], np.nan)
+            
+            # Check for any remaining infinite values
+            inf_cols = []
+            for col in X_train.columns:
+                if np.isinf(X_train[col]).any():
+                    inf_cols.append(col)
+            
+            if inf_cols:
+                logger.warning(f"Found columns with infinite values: {inf_cols}")
+                X_train[inf_cols] = X_train[inf_cols].replace([np.inf, -np.inf], np.nan)
+                X_test[inf_cols] = X_test[inf_cols].replace([np.inf, -np.inf], np.nan)
+            
+            # Fill NaN values with median for each column
+            for col in X_train.columns:
+                if X_train[col].isna().any():
+                    median_val = X_train[col].median()
+                    if pd.isna(median_val):
+                        median_val = 0  # If median is also NaN, use 0
+                    X_train[col] = X_train[col].fillna(median_val)
+                    X_test[col] = X_test[col].fillna(median_val)
+                    logger.info(f"Filled NaN values in {col} with median: {median_val}")
+            
+            # Clip extremely large values to prevent float32 overflow
+            # float32 max value is approximately 3.4e38
+            max_val = 1e30  # Use a conservative upper bound
+            min_val = -1e30
+            
+            for col in X_train.columns:
+                if X_train[col].abs().max() > max_val:
+                    logger.warning(f"Clipping extremely large values in column {col}")
+                    X_train[col] = X_train[col].clip(lower=min_val, upper=max_val)
+                    X_test[col] = X_test[col].clip(lower=min_val, upper=max_val)
+            
+            logger.info(f"Final training data shape: {X_train.shape}")
+            logger.info(f"Final test data shape: {X_test.shape}")
             
             # Cross-validate and train each model
             cv_scores = {}

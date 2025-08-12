@@ -106,14 +106,6 @@ with st.sidebar.expander("🔧 Debug Settings"):
         set_log_level(log_level)
         st.success(f"Log level set to {log_level}")
 
-# --- Model Selection Widget ---
-model_type = st.sidebar.selectbox(
-    "Select Model",
-    ["RandomForest", "XGBoost", "CatBoost"],
-    index=0,
-    help="Choose which machine learning model to use for price prediction."
-)
-
 # --- Vision Analysis Settings ---
 st.sidebar.markdown("### 👁️ Vision Analysis Settings")
 vision_timeout = st.sidebar.slider(
@@ -298,7 +290,7 @@ if "stock_data" in st.session_state:
             if 'volatility' in data.columns and pd.notna(latest['volatility']):
                 st.metric("Historical Vol", f"{latest['volatility']*100:.1f}%")
 
-    fig = plotter.create_enhanced_chart(
+    subplot_fig, daily_fig, timeframe_fig = plotter.create_enhanced_chart(
         data=data,
         indicators=st.session_state["active_indicators"],
         levels=levels,
@@ -319,7 +311,7 @@ if "stock_data" in st.session_state:
     logging.debug(f"🔍 Indicator list: {', '.join(sorted(indicator_columns))}")
 
 
-    st.plotly_chart(fig, use_container_width=True, height=800)
+    st.plotly_chart(subplot_fig, use_container_width=True, height=1000)
     
     # --- Display interactive chart in Tab 1 ---
     with tab1:
@@ -329,27 +321,31 @@ if "stock_data" in st.session_state:
             if not isinstance(levels, dict) or not ("support" in levels and "resistance" in levels):
                 levels = {'support': [], 'resistance': []}
                 
-            fig = plotter.create_enhanced_chart(
-                data, 
-                ticker_str, 
-                interval, 
-                st.session_state["active_indicators"], 
-                levels
+            subplot_fig, daily_fig, timeframe_fig = plotter.create_enhanced_chart(
+                data=data,
+                indicators=st.session_state["active_indicators"], 
+                levels=levels,
+                interval=interval
             )
         except Exception as chart_error:
             st.error(f"Error creating chart: {str(chart_error)}")
             # Create a simple fallback chart
             import plotly.graph_objects as go
-            fig = go.Figure()
-            fig.add_trace(go.Candlestick(
-                x=data.index,
-                open=data['Open'],
-                high=data['High'],
-                low=data['Low'],
-                close=data['Close'],
-                name='Price'
-            ))
-        st.plotly_chart(fig, use_container_width=True)
+            subplot_fig = go.Figure()
+            daily_fig = go.Figure() 
+            timeframe_fig = go.Figure()
+            
+            # Add data to all charts
+            for chart in [subplot_fig, daily_fig, timeframe_fig]:
+                chart.add_trace(go.Candlestick(
+                    x=data.index,
+                    open=data['Open'],
+                    high=data['High'],
+                    low=data['Low'],
+                    close=data['Close'],
+                    name='Price'
+                ))
+        st.plotly_chart(subplot_fig, use_container_width=True)
         
         # Display technical indicators summary
         st.markdown("### Technical Indicators Summary")
@@ -603,13 +599,12 @@ if "stock_data" in st.session_state:
             status_text.text("🔮 Generating price predictions...")
             progress_bar.progress(20)
             
-            # Get the price prediction with selected model
+            # Get the price prediction using ensemble of models
             try:
                 prediction_result = predict_next_day_close(
                     data.copy(),
                     fundamentals,
-                    st.session_state["active_indicators"],
-                    model_type=model_type
+                    st.session_state["active_indicators"]
                 )
                 
                 if prediction_result and isinstance(prediction_result, tuple) and prediction_result[0] is not None:
@@ -653,7 +648,7 @@ PRICE CHANGE: ${price_change:.2f} ({(price_change/data['Close'].iloc[-1]*100):.1
             kaleido_logger.setLevel(base_logging.WARNING)
             
             try:
-                fig.write_image(chart_path)
+                subplot_fig.write_image(chart_path)
                 print(f"✅ Chart prepared for AI analysis")
             except Exception as e:
                 print(f"❌ Error saving chart: {e}")
@@ -680,7 +675,8 @@ PRICE CHANGE: ${price_change:.2f} ({(price_change/data['Close'].iloc[-1]*100):.1
                     adjusted_timeout = 0  # Skip vision analysis
                 
                 analysis, recommendation = ai_analysis.run_ai_analysis(
-                    fig=fig,
+                    daily_fig=daily_fig,
+                    timeframe_fig=timeframe_fig,
                     data=data,
                     ticker=ticker,
                     prompt=prompt,

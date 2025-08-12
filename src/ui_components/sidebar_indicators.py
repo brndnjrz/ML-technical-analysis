@@ -14,7 +14,7 @@ def sidebar_indicator_selection(strategy_type, interval, data=None):
     
     Args:
         strategy_type: Strategy type string
-        interval: Time interval string ("1d", "1wk", "1mo")
+        interval: Time interval string ("5m", "15m", "30m", "1h", "1d")
         data: Optional DataFrame with price data
         
     Returns:

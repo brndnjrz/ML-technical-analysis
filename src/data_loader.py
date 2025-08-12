@@ -56,16 +56,9 @@ COLUMN_MAPPING = {
     'Adj Close': 'Adj_Close'  # Handle adjusted close
 }
 
-def get_fundamental_data(ticker, timeout=10):
+def get_fundamental_data(ticker):
     """
-    Fetch fundamental data for a given ticker.
-    
-    Args:
-        ticker (str): Stock ticker symbol
-        timeout (int): Timeout in seconds for the API request (default 10)
-    
-    Returns:
-        dict: Dictionary containing fundamental metrics
+    Fetch fundamental data for a given ticker
     """
     try:
         # Create ticker with timeout parameter
@@ -97,46 +90,46 @@ def get_fundamental_data(ticker, timeout=10):
         except Exception as e:
             print(f"Skipping detailed info due to: {e}")
             detailed_info = {}
-                
-            # Initialize safe values
-            fast_info_values = {}
-            try:
-                # Safely access fast_info attributes
-                if hasattr(stock, 'fast_info'):
-                    fast_info = stock.fast_info
-                    # Use a safe access pattern for each attribute
-                    if hasattr(fast_info, 'trailing_pe'):
-                        fast_info_values['trailing_pe'] = fast_info.trailing_pe if fast_info.trailing_pe is not None else 0.0
-                    if hasattr(fast_info, 'market_cap'):
-                        fast_info_values['market_cap'] = fast_info.market_cap if fast_info.market_cap is not None else 0.0
-                    if hasattr(fast_info, 'last_volume'):
-                        fast_info_values['last_volume'] = fast_info.last_volume if fast_info.last_volume is not None else 0
-                    if hasattr(fast_info, 'three_month_average_daily_volume'):
-                        fast_info_values['three_month_average_daily_volume'] = fast_info.three_month_average_daily_volume if fast_info.three_month_average_daily_volume is not None else 0
-                    if hasattr(fast_info, 'beta'):
-                        fast_info_values['beta'] = fast_info.beta if fast_info.beta is not None else 1.0
-                    if hasattr(fast_info, 'dividend_yield'):
-                        fast_info_values['dividend_yield'] = fast_info.dividend_yield if fast_info.dividend_yield is not None else 0.0
-            except Exception as e:
-                print(f"Error accessing fast_info attributes: {e}")
             
-            # Calculate metrics with default values and fallbacks
-            # Make sure detailed_info is a dictionary
-            if not isinstance(detailed_info, dict):
-                detailed_info = {}
-                
-            fundamentals = {
-                'EPS': detailed_info.get('trailingEPS', 0.0),
-                'Revenue Growth': detailed_info.get('revenueGrowth', 0.0),
-                'Profit Margin': detailed_info.get('profitMargins', 0.0),
-                'P/E Ratio': fast_info_values.get('trailing_pe', 0.0),
-                'Market Cap': fast_info_values.get('market_cap', 0.0),
-                'Volume': fast_info_values.get('last_volume', 0),
-                'Average Volume': fast_info_values.get('three_month_average_daily_volume', 0),
-                'Forward P/E': detailed_info.get('forwardPE', 0.0),
-                'PEG Ratio': detailed_info.get('pegRatio', 0.0),
-                'Beta': fast_info_values.get('beta', 1.0),
-                'Dividend Yield': fast_info_values.get('dividend_yield', 0.0)
+        # Initialize safe values
+        fast_info_values = {}
+        try:
+            # Safely access fast_info attributes
+            if hasattr(stock, 'fast_info'):
+                fast_info = stock.fast_info
+                # Use a safe access pattern for each attribute
+                if hasattr(fast_info, 'trailing_pe'):
+                    fast_info_values['trailing_pe'] = fast_info.trailing_pe if fast_info.trailing_pe is not None else 0.0
+                if hasattr(fast_info, 'market_cap'):
+                    fast_info_values['market_cap'] = fast_info.market_cap if fast_info.market_cap is not None else 0.0
+                if hasattr(fast_info, 'last_volume'):
+                    fast_info_values['last_volume'] = fast_info.last_volume if fast_info.last_volume is not None else 0
+                if hasattr(fast_info, 'three_month_average_daily_volume'):
+                    fast_info_values['three_month_average_daily_volume'] = fast_info.three_month_average_daily_volume if fast_info.three_month_average_daily_volume is not None else 0
+                if hasattr(fast_info, 'beta'):
+                    fast_info_values['beta'] = fast_info.beta if fast_info.beta is not None else 1.0
+                if hasattr(fast_info, 'dividend_yield'):
+                    fast_info_values['dividend_yield'] = fast_info.dividend_yield if fast_info.dividend_yield is not None else 0.0
+        except Exception as e:
+            print(f"Error accessing fast_info attributes: {e}")
+        
+        # Calculate metrics with default values and fallbacks
+        # Make sure detailed_info is a dictionary
+        if not isinstance(detailed_info, dict):
+            detailed_info = {}
+            
+        fundamentals = {
+            'EPS': detailed_info.get('trailingEPS', 0.0),
+            'Revenue Growth': detailed_info.get('revenueGrowth', 0.0),
+            'Profit Margin': detailed_info.get('profitMargins', 0.0),
+            'P/E Ratio': fast_info_values.get('trailing_pe', 0.0),
+            'Market Cap': fast_info_values.get('market_cap', 0.0),
+            'Volume': fast_info_values.get('last_volume', 0),
+            'Average Volume': fast_info_values.get('three_month_average_daily_volume', 0),
+            'Forward P/E': detailed_info.get('forwardPE', 0.0),
+            'PEG Ratio': detailed_info.get('pegRatio', 0.0),
+            'Beta': fast_info_values.get('beta', 1.0),
+            'Dividend Yield': fast_info_values.get('dividend_yield', 0.0)
         }
         
         # Convert ratios to percentages where appropriate
@@ -154,8 +147,7 @@ def get_fundamental_data(ticker, timeout=10):
             fundamentals['Dividend Yield'] = float(fundamentals['Dividend Yield']) * 100
         except (ValueError, TypeError):
             fundamentals['Dividend Yield'] = 0.0
-            fundamentals['Dividend Yield'] = fundamentals['Dividend Yield'] * 100
-            
+        
         return fundamentals
         
     except Exception as e:
@@ -165,7 +157,7 @@ def get_fundamental_data(ticker, timeout=10):
 # =========================
 # Main Data Fetching Function
 # =========================
-def fetch_stock_data(ticker, start_date=None, end_date=None, interval="1d"):
+def fetch_stock_data(ticker, start_date=None, end_date=None, interval="15m"):
     """
     Fetch stock data from Yahoo Finance.
 
@@ -198,6 +190,10 @@ def fetch_stock_data(ticker, start_date=None, end_date=None, interval="1d"):
             df = stock.history(period=period, interval=interval)
         else:
             df = stock.history(start=start_date, end=end_date, interval=interval)
+        
+        # Store ticker symbol as attribute for later reference
+        if isinstance(df, pd.DataFrame) and not df.empty:
+            df.attrs['ticker'] = ticker
 
         # Check if data was returned
         if df is None or df.empty:
@@ -257,7 +253,7 @@ def test_data_fetch(ticker="AAPL"):
     end_date = datetime.date.today()
     start_date = end_date - datetime.timedelta(days=30)
     print(f"Testing data fetch for {ticker}...")
-    data = fetch_stock_data(ticker, start_date, end_date, "1d")
+    data = fetch_stock_data(ticker, start_date, end_date, "15m")
     if data is not None:
         print(f"✅ Success! Got {len(data)} rows")
         print(f"Columns: {data.columns.tolist()}")

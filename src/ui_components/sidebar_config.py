@@ -30,15 +30,17 @@ def sidebar_config(config=None):
     end_date = st.sidebar.date_input("End Date", DEFAULT_END_DATE.date())
     
     interval_options = {
-        "1d": "Daily",
-        "1wk": "Weekly",
-        "1mo": "Monthly"
+        "5m": "5min (Scalping)",
+        "15m": "15min (Day Trading)",
+        "30m": "30min (Short-term)",
+        "1h": "1hour (Swing)",
+        "1d": "Daily (Long-term)"
     }
     interval = st.sidebar.selectbox(
         "Select Timeframe:",
         options=list(interval_options.keys()),
         format_func=lambda x: interval_options[x],
-        index=0
+        index=1
     )
     analysis_type = st.sidebar.selectbox(
         "Analysis Type:",
