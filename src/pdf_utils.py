@@ -4,7 +4,7 @@ import tempfile
 import pandas as pd
 import streamlit as st
 import re
-from src import pdf_generator
+from . import pdf_generator
 
 def sanitize_text(text):
     """Remove emojis and non-Latin characters from text for PDF compatibility."""

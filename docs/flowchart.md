@@ -1,3 +1,5 @@
+# App Flowchart
+
 ```mermaid
 flowchart TD
     %% USER & UI FLOW

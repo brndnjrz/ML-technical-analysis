@@ -3,7 +3,7 @@
 # =========================
 import plotly.graph_objects as go
 import plotly.subplots as sp
-from src import data_loader
+from .core import data_loader
 import pandas as pd
 
 # =========================

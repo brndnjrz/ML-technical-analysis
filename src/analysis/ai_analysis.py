@@ -4,7 +4,7 @@ import io
 import tempfile
 import threading
 import queue
-from src.ai_agents import HedgeFundAI
+from ..ai_agents import HedgeFundAI
 import pandas as pd
 import json
 import time

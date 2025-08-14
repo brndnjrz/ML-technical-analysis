@@ -8,7 +8,7 @@ import streamlit as st
 import datetime
 from datetime import timedelta
 from typing import Dict, Any, Tuple, List, Optional
-from src.config import DEFAULT_TICKER, DEFAULT_START_DATE, DEFAULT_END_DATE
+from ..utils.config import DEFAULT_TICKER, DEFAULT_START_DATE, DEFAULT_END_DATE
 
 def sidebar_config(config=None):
     """
