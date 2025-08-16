@@ -697,10 +697,10 @@ def analyze_options_market_regime(data: pd.DataFrame) -> Dict[str, Any]:
     Analyze the current market regime for options trading strategy selection.
     
     Options strategies perform differently under different market regimes:
-    - Trending markets: Directional strategies (calls/puts)
+    - Trending markets: Directional strategies (swing trading, day trading)
     - Range-bound markets: Non-directional strategies (iron condors)
-    - High volatility: Long volatility strategies (straddles/strangles)
-    - Low volatility: Short volatility strategies (iron condors/credit spreads)
+    - High volatility: Volatility strategies (day trading calls/puts)
+    - Low volatility: Income strategies (covered calls, cash-secured puts)
     
     Args:
         data (pd.DataFrame): DataFrame with price and indicator data
@@ -794,33 +794,33 @@ def analyze_options_market_regime(data: pd.DataFrame) -> Dict[str, Any]:
                 "avoid": "Iron Condors"
             },
             "trending_high_vol": {
-                "primary": "Directional Debit Spreads",
-                "secondary": "Long Calls/Puts with reduced position size",
-                "avoid": "Naked short options"
+                "primary": "Credit Spreads",
+                "secondary": "Swing Trading with reduced position size",
+                "avoid": "Iron Condors"
             },
             "ranging_low_vol": {
                 "primary": "Iron Condors",
                 "secondary": "Credit Spreads at range boundaries",
-                "avoid": "Long Straddles/Strangles"
+                "avoid": "Day Trading Calls/Puts"
             },
             "ranging_high_vol": {
                 "primary": "Wide Iron Condors",
-                "secondary": "Calendar Spreads",
+                "secondary": "Covered Calls",
                 "avoid": "Tight Iron Condors"
             },
             "topping": {
-                "primary": "Bear Call Spreads",
-                "secondary": "Put Debit Spreads",
-                "avoid": "Naked Calls"
+                "primary": "Credit Spreads",
+                "secondary": "Cash-Secured Puts",
+                "avoid": "Covered Calls"
             },
             "bottoming": {
-                "primary": "Bull Put Spreads",
-                "secondary": "Call Debit Spreads",
-                "avoid": "Naked Puts"
+                "primary": "Cash-Secured Puts",
+                "secondary": "Credit Spreads",
+                "avoid": "Covered Calls"
             },
             "mixed": {
                 "primary": "Balanced Iron Condors",
-                "secondary": "Calendar Spreads",
+                "secondary": "Credit Spreads",
                 "avoid": "Highly directional trades"
             }
         }
@@ -1039,16 +1039,16 @@ def calculate_iv_metrics(ticker: str, data: pd.DataFrame) -> Dict[str, float]:
         # Create options strategy suggestions based on volatility metrics
         strategy_suggestions = []
         if iv_rank > 70 and vol_regime == "High":
-            strategy_suggestions.append("Iron Condor (Sell OTM Call & Put Spreads)")
+            strategy_suggestions.append("Iron Condors (Sell OTM Call & Put Spreads)")
             strategy_suggestions.append("Credit Spreads (High Premium)")
         elif iv_rank < 30 and vol_regime == "Low":
-            strategy_suggestions.append("Long Calls/Puts (Directional Plays)")
-            strategy_suggestions.append("Calendar Spreads (Exploit Term Structure)")
+            strategy_suggestions.append("Day Trading Calls/Puts (Directional Plays)")
+            strategy_suggestions.append("Swing Trading (Exploit Trends)")
         
         if vol_trend == "Rising":
-            strategy_suggestions.append("Long Volatility (Buy Straddles/Strangles)")
+            strategy_suggestions.append("Day Trading Calls/Puts (Buy Options)")
         elif vol_trend == "Falling":
-            strategy_suggestions.append("Short Volatility (Sell Premium)")
+            strategy_suggestions.append("Covered Calls/Cash-Secured Puts (Sell Premium)")
         
         # Prepare comprehensive IV metrics dictionary for options trading
         return {
@@ -1209,7 +1209,7 @@ def calculate_options_indicators(data: pd.DataFrame) -> Dict[str, Any]:
         # Generate non-directional recommendation
         if bb_width < 0.03:  # Narrow bands - potential breakout
             non_directional['recommendation'] = "potential_breakout"
-            non_directional['options_strategy'] = "Avoid Iron Condors, consider Straddles"
+            non_directional['options_strategy'] = "Avoid Iron Condors, consider Day Trading Calls/Puts"
         elif rsi_condition == "neutral" and vol_trend == "stable":
             non_directional['recommendation'] = "range_bound"
             non_directional['options_strategy'] = "Iron Condor (balanced)"

@@ -125,7 +125,7 @@ def run_ai_analysis(daily_fig, timeframe_fig, data: pd.DataFrame, ticker: str, p
         print("📈 Prioritizing options strategies (calls, puts, and iron condors)")
         config = {
             'prioritize_options_strategies': True,
-            'preferred_strategies': ['Day Trading Calls/Puts', 'Iron Condor', 'Butterfly Spread']
+            'preferred_strategies': ['Day Trading Calls/Puts', 'Iron Condors', 'Credit Spreads']
         }
     else:
         print("📈 Using balanced strategy mix (stocks and options)")

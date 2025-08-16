@@ -846,7 +846,7 @@ def create_strategy_features(data: pd.DataFrame, strategy_type: str) -> pd.DataF
             'momentum_confirm': (df['RSI_14'] > 40) & (df['RSI_14'] < 70)
         },
         
-        "Iron Condor": {
+        "Iron Condors": {
             'volatility_high': df['ATR'] > df['ATR'].rolling(20).mean(),
             'range_bound': (df['Close'] > df['BB_lower']) & (df['Close'] < df['BB_upper']),
             'trend_weak': df['ADX'] < 25

@@ -24,7 +24,7 @@ from src.ui_components import (
 )
 
 # Data
-from src.trading_strategies import strategies_data
+from src.trading_strategies import strategies_data, get_strategy_by_name
 
 # Setup cleaner logging for Streamlit
 setup_logging(level=logging.INFO, enable_file_logging=False)
@@ -481,18 +481,23 @@ if "stock_data" in st.session_state:
 
     # Add strategy context
     if options_strategy:
-        selected_strategy_info = next((s for s in strategies_data if s["Strategy"] == options_strategy), None)
+        selected_strategy_info = get_strategy_by_name(options_strategy)
         if selected_strategy_info:
-            strategy_context = f"""
-            SELECTED STRATEGY CONTEXT:
-            - Strategy: {selected_strategy_info['Strategy']}
-            - Description: {selected_strategy_info['Description']}
-            - Timeframe: {selected_strategy_info['Timeframe']}
-            - Pros: {', '.join(selected_strategy_info['Pros'])}
-            - Cons: {', '.join(selected_strategy_info['Cons'])}
-            - When to Use: {selected_strategy_info['When to Use']}
-            """
-            market_context += "\n" + strategy_context
+            # Get first available timeframe for strategy context
+            timeframes = selected_strategy_info.get('Timeframes', {})
+            first_timeframe = list(timeframes.keys())[0] if timeframes else None
+            
+            if first_timeframe:
+                timeframe_data = timeframes[first_timeframe]
+                strategy_context = f"""
+                SELECTED STRATEGY CONTEXT:
+                - Strategy: {selected_strategy_info['Strategy']}
+                - Timeframe: {first_timeframe}
+                - Best Use: {timeframe_data.get('Best_Use', 'N/A')}
+                - Key Indicators: {', '.join(timeframe_data.get('Key_Indicators', [])[:3])}
+                - Advanced Tips: {', '.join(timeframe_data.get('Advanced_Tips', [])[:2])}
+                """
+                market_context += "\n" + strategy_context
 
     if options_data:
         market_context += f"""
