@@ -4,7 +4,8 @@
 import pandas as pd
 import streamlit as st
 import traceback
-from src import data_loader, indicators
+from . import data_loader
+from ..analysis import indicators
 
 # =========================
 # Main Data Pipeline Function
@@ -64,7 +65,5 @@ def fetch_and_process_data(
 
     except Exception as e:
         st.error(f"❌ Error in fetch_and_process_data: {str(e)}")
-        st.code(traceback.format_exc())
-        return None, None, None
         st.code(traceback.format_exc())
         return None, None, None

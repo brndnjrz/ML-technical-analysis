@@ -78,26 +78,26 @@ class HedgeFundAI:
                 if 'IC_SUITABILITY' in data.columns:
                     ic_score = data['IC_SUITABILITY'].iloc[-1]
                     
-                    # High IC suitability score (>70) suggests iron condor or butterfly strategy
+                    # High IC suitability score (>70) suggests iron condor strategies
                     if ic_score > 70:
-                        self.config['preferred_strategies'] = ['Iron Condor', 'Butterfly Spread', 'Calendar Spread']
-                        logger.info(f"📈 Options strategies prioritized: Iron Condor (Suitability: {ic_score:.1f})")
-                    # Medium IC suitability (40-70) suggests directional spreads
+                        self.config['preferred_strategies'] = ['Iron Condors', 'Credit Spreads']
+                        logger.info(f"📈 Options strategies prioritized: Iron Condors (Suitability: {ic_score:.1f})")
+                    # Medium IC suitability (40-70) suggests covered call strategies
                     elif ic_score > 40:
-                        self.config['preferred_strategies'] = ['Bull Put Spread', 'Bear Call Spread', 'Calendar Spread']
-                        logger.info(f"📈 Options strategies prioritized: Vertical Spreads (Suitability: {ic_score:.1f})")
+                        self.config['preferred_strategies'] = ['Covered Calls', 'Cash-Secured Puts', 'Credit Spreads']
+                        logger.info(f"📈 Options strategies prioritized: Income Strategies (Suitability: {ic_score:.1f})")
                     # Low IC suitability (<40) suggests directional strategies
                     else:
-                        self.config['preferred_strategies'] = ['Day Trading Calls/Puts', 'LEAPS Options', 'Bull Call Spread']
+                        self.config['preferred_strategies'] = ['Day Trading Calls/Puts', 'Swing Trading']
                         logger.info(f"📈 Options strategies prioritized: Directional Calls/Puts (Suitability: {ic_score:.1f})")
                 else:
                     # Default if no specific indicators available
-                    self.config['preferred_strategies'] = ['Day Trading Calls/Puts', 'Iron Condor', 'Bull Call Spread']
+                    self.config['preferred_strategies'] = ['Day Trading Calls/Puts', 'Iron Condors', 'Covered Calls']
                     logger.info("📈 Options strategies prioritized: Mixed options strategies")
             else:
                 # Still use the selected strategies but without preference
                 self.config['prioritize_options_strategies'] = False
-                self.config['preferred_strategies'] = ['Swing Trading', 'Day Trading', 'Day Trading Calls/Puts']
+                self.config['preferred_strategies'] = ['Swing Trading', 'Day Trading Calls/Puts']
                 logger.info("📈 Using balanced strategy selection (no options priority)")
                 
             strategy_view = self.strategist.develop_strategy(analyst_view, data, options_priority, options_data)
@@ -538,7 +538,7 @@ class HedgeFundAI:
                 notes.append("RECOMMENDATION: HOLD - insufficient conviction for directional bet")
             
             # Add strategy-specific notes
-            if strategy.get('name') == 'Iron Condor':
+            if strategy.get('name') == 'Iron Condors':
                 notes.append("OPTIONS STRATEGY: Neutral outlook - profit from time decay and range-bound movement")
             elif 'Day Trading' in strategy.get('name', ''):
                 notes.append("INTRADAY STRATEGY: High-frequency approach - requires active monitoring")
@@ -587,7 +587,7 @@ class HedgeFundAI:
                 return 'MEDIUM'
             
             # Lower-risk strategies
-            elif any(term in strategy_name for term in ['Covered Calls', 'Protective Puts', 'Iron Condor']):
+            elif any(term in strategy_name for term in ['Covered Calls', 'Protective Puts', 'Iron Condors']):
                 return 'LOW'
             
             else:

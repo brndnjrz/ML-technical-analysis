@@ -2,7 +2,7 @@ import pandas as pd
 from typing import Dict, Any
 import numpy as np
 import logging
-from ..trading_strategies import strategies_data
+from ..trading_strategies import strategies_data, get_strategy_by_market_condition, get_strategy_by_risk_tolerance, get_strategy_by_timeframe
 
 # Setup logger
 logger = logging.getLogger(__name__)
@@ -69,13 +69,13 @@ class StrategyAgent:
                     # Determine if IV is high, low, or normal
                     if iv_rank > 0.7:
                         conditions['options']['iv_state'] = 'high'
-                        conditions['options']['recommended_strategies'] = ['Iron Condor', 'Credit Spread', 'Calendar Spread']
+                        conditions['options']['recommended_strategies'] = ['Iron Condors', 'Credit Spreads']
                     elif iv_rank < 0.3:
                         conditions['options']['iv_state'] = 'low'
-                        conditions['options']['recommended_strategies'] = ['Long Call/Put', 'Debit Spread', 'LEAPS']
+                        conditions['options']['recommended_strategies'] = ['Day Trading Calls/Puts', 'Swing Trading']
                     else:
                         conditions['options']['iv_state'] = 'normal'
-                        conditions['options']['recommended_strategies'] = ['Vertical Spread', 'Butterfly', 'Diagonal Spread']
+                        conditions['options']['recommended_strategies'] = ['Covered Calls', 'Cash-Secured Puts']
             
             # Check for special conditions in the data if they exist
             if 'IC_SUITABILITY' in data.columns:
@@ -191,7 +191,7 @@ class StrategyAgent:
         
         Focus on a limited set of strategies:
         - Day Trading Calls/Puts
-        - Iron Condor
+        - Iron Condors
         - Swing Trading
         """
         strategy_matches = []
@@ -228,8 +228,8 @@ class StrategyAgent:
                 'reason': f'Directional options trading ({trend_direction}) with {trend_strength} trend'
             })
             
-            # STRATEGY 2: IRON CONDOR
-            # Include Iron Condor for neutral/range-bound markets
+            # STRATEGY 2: IRON CONDORS
+            # Include Iron Condors for neutral/range-bound markets
             iron_condor_confidence = 0.7  # Base confidence
             
             # Adjust confidence based on conditions
@@ -243,7 +243,7 @@ class StrategyAgent:
                 iron_condor_confidence += 0.05  # Boost for weak trends (range-bound)
             
             strategy_matches.append({
-                'name': 'Iron Condor',
+                'name': 'Iron Condors',
                 'type': 'neutral',
                 'confidence': min(0.95, iron_condor_confidence),  # Cap at 0.95
                 'reason': 'Range-bound market strategy with defined risk/reward'
@@ -301,8 +301,8 @@ class StrategyAgent:
             
             # If we have price data and this is an options strategy, add comprehensive strike selection
             if current_price is not None and strategy_name in [
-                'Day Trading Calls/Puts', 'Iron Condor', 'Straddle/Strangle', 
-                'Covered Calls', 'Credit Spreads', 'Calendar Spreads'
+                'Day Trading Calls/Puts', 'Iron Condors', 'Swing Trading',
+                'Covered Calls', 'Credit Spreads', 'Cash-Secured Puts'
             ]:
                 # We'll use a default approach since we don't have data here
                 # Just calculate some common strike distances
@@ -313,7 +313,7 @@ class StrategyAgent:
                 }
                 parameters['strike_info'] = strike_info['final_recommendation']
             
-            # Strategy-specific parameters
+            # Strategy-specific parameters (only for approved strategies)
             if strategy_name == 'Day Trading Calls/Puts':
                 parameters.update({
                     'entry_condition': 'momentum_breakout',
@@ -324,40 +324,56 @@ class StrategyAgent:
                     'strike_selection': 'comprehensive'
                 })
             
-            elif strategy_name == 'Iron Condor':
+            elif strategy_name == 'Iron Condors':
                 parameters.update({
                     'entry_condition': 'high_iv_rank',
                     'exit_condition': 'profit_target_or_time',
-                    'strike_selection': 'comprehensive',  # Using the new comprehensive approach
+                    'strike_selection': 'comprehensive',
                     'profit_target': '25_percent_max_profit',
                     'time_decay_benefit': True
                 })
             
-            elif strategy_name == 'Straddle/Strangle':
-                parameters.update({
-                    'entry_condition': 'volatility_expansion_expected',
-                    'exit_condition': 'volatility_crush_or_profit',
-                    'strike_selection': 'comprehensive',  # Using the new comprehensive approach
-                    'profit_target': 'volatility_based',
-                    'time_decay_risk': True
-                })
-            
             elif strategy_name == 'Swing Trading':
                 parameters.update({
-                    'entry_condition': 'trend_continuation',
+                    'entry_condition': 'trend_confirmation',
                     'exit_condition': 'trend_reversal_or_target',
-                    'stop_loss': 'swing_low_high',
-                    'profit_target': 'resistance_support_levels',
-                    'trailing_stop': True
+                    'strike_selection': 'comprehensive',
+                    'holding_period': '2_to_8_weeks',
+                    'trend_following': True
                 })
             
             elif strategy_name == 'Covered Calls':
                 parameters.update({
-                    'entry_condition': 'own_underlying_stock',
-                    'exit_condition': 'expiration_or_buyback',
-                    'strike_selection': 'comprehensive',  # Using the new comprehensive approach
-                    'income_strategy': True,
-                    'assignment_risk': True
+                    'entry_condition': 'stock_ownership_required',
+                    'exit_condition': 'expiration_or_early_close',
+                    'strike_selection': 'otm_resistance_based',
+                    'income_generation': True,
+                    'stock_protection': 'limited_upside'
+                })
+            
+            elif strategy_name == 'Cash-Secured Puts':
+                parameters.update({
+                    'entry_condition': 'cash_secured',
+                    'exit_condition': 'assignment_or_profit',
+                    'strike_selection': 'support_based',
+                    'income_generation': True,
+                    'stock_acquisition': 'potential'
+                })
+            
+            elif strategy_name == 'Credit Spreads':
+                parameters.update({
+                    'entry_condition': 'directional_bias',
+                    'exit_condition': 'profit_target_or_adjustment',
+                    'strike_selection': 'probability_based',
+                    'defined_risk': True,
+                    'time_decay_benefit': True
+                })
+            
+            # Add risk management parameters based on volatility
+            if current_price is not None:
+                parameters.update({
+                    'current_price': current_price,
+                    'risk_management': 'enabled'
                 })
             
             # Add market condition adjustments
@@ -590,7 +606,7 @@ class StrategyAgent:
             }
             
             # 4. Make final recommendation based on strategy type
-            if strategy_type in ['Iron Condor', 'Short Strangle']:
+            if strategy_type in ['Iron Condors']:
                 # For iron condors, we want balanced strikes that combine all methods
                 result['final_recommendation'] = {
                     'call_strike': self._weighted_average([
@@ -620,20 +636,43 @@ class StrategyAgent:
                         result['delta_based']['delta_30']['put']
                     ], weights=[0.3, 0.5, 0.2])
                     
-            elif strategy_type in ['Long Call', 'Long Put']:
+            elif strategy_type in ['Day Trading Calls/Puts']:
                 # For directional strategies, blend all methods
-                if strategy_type == 'Long Call':
-                    result['final_recommendation']['strike'] = self._weighted_average([
-                        current_price, # ATM
-                        self._closest_level(result['technical_levels']['support'], current_price, 'below'),
-                        result['delta_based']['delta_30']['call']
-                    ], weights=[0.4, 0.3, 0.3])
-                else:
-                    result['final_recommendation']['strike'] = self._weighted_average([
-                        current_price, # ATM
-                        self._closest_level(result['technical_levels']['resistance'], current_price, 'above'),
-                        result['delta_based']['delta_30']['put']
-                    ], weights=[0.4, 0.3, 0.3])
+                result['final_recommendation']['strike'] = self._weighted_average([
+                    current_price, # ATM
+                    self._closest_level(result['technical_levels']['support'], current_price, 'below'),
+                    result['delta_based']['delta_30']['call']
+                ], weights=[0.4, 0.3, 0.3])
+                
+            elif strategy_type in ['Credit Spreads']:
+                # For credit spreads, target OTM strikes
+                result['final_recommendation']['short_strike'] = self._weighted_average([
+                    result['standard_deviation']['one_std']['up'],
+                    self._closest_level(result['technical_levels']['resistance'], current_price, 'above'),
+                    result['delta_based']['delta_30']['call']
+                ], weights=[0.3, 0.4, 0.3])
+                
+            elif strategy_type in ['Covered Calls']:
+                # For covered calls, target resistance levels
+                result['final_recommendation']['strike'] = self._weighted_average([
+                    self._closest_level(result['technical_levels']['resistance'], current_price, 'above'),
+                    result['delta_based']['delta_30']['call']
+                ], weights=[0.6, 0.4])
+                
+            elif strategy_type in ['Cash-Secured Puts']:
+                # For cash-secured puts, target support levels
+                result['final_recommendation']['strike'] = self._weighted_average([
+                    self._closest_level(result['technical_levels']['support'], current_price, 'below'),
+                    result['delta_based']['delta_30']['put']
+                ], weights=[0.6, 0.4])
+                
+            elif strategy_type in ['Swing Trading']:
+                # For swing trading, use momentum and trend-based strikes
+                result['final_recommendation']['strike'] = self._weighted_average([
+                    current_price,
+                    self._closest_level(result['technical_levels']['resistance'], current_price, 'above'),
+                    result['delta_based']['delta_50']['call']
+                ], weights=[0.3, 0.4, 0.3])
             else:
                 # Default to standard deviation approach
                 result['final_recommendation']['upper_strike'] = result['standard_deviation']['one_std']['up']

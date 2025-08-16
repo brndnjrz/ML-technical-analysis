@@ -3,18 +3,28 @@ import pandas as pd
 import os
 import logging 
 import re
-from src import plotter, ai_analysis, config
-from src.data_pipeline import fetch_and_process_data
-from src.prediction import get_fundamental_metrics, predict_next_day_close
+
+# Core functionality imports
+from src import plotter
+from src.core.data_pipeline import fetch_and_process_data
+from src.analysis.prediction import get_fundamental_metrics, predict_next_day_close
+from src.analysis.ai_analysis import run_ai_analysis
+
+# Utility imports
+from src.utils.config import DEFAULT_TICKER, DEFAULT_START_DATE, DEFAULT_END_DATE
+from src.utils.logging_config import setup_logging, set_log_level
+from src.utils.temp_manager import temp_manager, cleanup_old_temp_files
 from src.pdf_utils import generate_and_display_pdf
+
+# UI components
 from src.ui_components import (
     render_sidebar_quick_stats, 
     sidebar_config, 
     sidebar_indicator_selection
 )
-from src.trading_strategies import strategies_data  # Add this import at the top
-from src.logging_config import setup_logging, set_log_level
-from src.temp_manager import temp_manager, cleanup_old_temp_files
+
+# Data
+from src.trading_strategies import strategies_data, get_strategy_by_name
 
 # Setup cleaner logging for Streamlit
 setup_logging(level=logging.INFO, enable_file_logging=False)
@@ -130,7 +140,7 @@ enable_vision_analysis = st.sidebar.checkbox(
 
 # --- Modular Sidebar ---
 # Stock ticker, date range, timeframee/interval, analysis type, strategy type, technical indicators
-ticker, start_date, end_date, interval, analysis_type, strategy_type, options_strategy, options_priority = sidebar_config(config)
+ticker, start_date, end_date, interval, analysis_type, strategy_type, options_strategy, options_priority = sidebar_config()
 
 # Store analysis type in session state for other components to access
 if 'analysis_type' not in st.session_state:
@@ -471,18 +481,23 @@ if "stock_data" in st.session_state:
 
     # Add strategy context
     if options_strategy:
-        selected_strategy_info = next((s for s in strategies_data if s["Strategy"] == options_strategy), None)
+        selected_strategy_info = get_strategy_by_name(options_strategy)
         if selected_strategy_info:
-            strategy_context = f"""
-            SELECTED STRATEGY CONTEXT:
-            - Strategy: {selected_strategy_info['Strategy']}
-            - Description: {selected_strategy_info['Description']}
-            - Timeframe: {selected_strategy_info['Timeframe']}
-            - Pros: {', '.join(selected_strategy_info['Pros'])}
-            - Cons: {', '.join(selected_strategy_info['Cons'])}
-            - When to Use: {selected_strategy_info['When to Use']}
-            """
-            market_context += "\n" + strategy_context
+            # Get first available timeframe for strategy context
+            timeframes = selected_strategy_info.get('Timeframes', {})
+            first_timeframe = list(timeframes.keys())[0] if timeframes else None
+            
+            if first_timeframe:
+                timeframe_data = timeframes[first_timeframe]
+                strategy_context = f"""
+                SELECTED STRATEGY CONTEXT:
+                - Strategy: {selected_strategy_info['Strategy']}
+                - Timeframe: {first_timeframe}
+                - Best Use: {timeframe_data.get('Best_Use', 'N/A')}
+                - Key Indicators: {', '.join(timeframe_data.get('Key_Indicators', [])[:3])}
+                - Advanced Tips: {', '.join(timeframe_data.get('Advanced_Tips', [])[:2])}
+                """
+                market_context += "\n" + strategy_context
 
     if options_data:
         market_context += f"""
@@ -674,7 +689,7 @@ PRICE CHANGE: ${price_change:.2f} ({(price_change/data['Close'].iloc[-1]*100):.1
                     status_text.text("🧠 Running AI analysis (Vision analysis disabled)...")
                     adjusted_timeout = 0  # Skip vision analysis
                 
-                analysis, recommendation = ai_analysis.run_ai_analysis(
+                analysis, recommendation = run_ai_analysis(
                     daily_fig=daily_fig,
                     timeframe_fig=timeframe_fig,
                     data=data,

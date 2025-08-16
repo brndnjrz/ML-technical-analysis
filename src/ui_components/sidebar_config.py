@@ -8,7 +8,8 @@ import streamlit as st
 import datetime
 from datetime import timedelta
 from typing import Dict, Any, Tuple, List, Optional
-from src.config import DEFAULT_TICKER, DEFAULT_START_DATE, DEFAULT_END_DATE
+from ..utils.config import DEFAULT_TICKER, DEFAULT_START_DATE, DEFAULT_END_DATE
+from ..trading_strategies import get_strategy_names
 
 def sidebar_config(config=None):
     """
@@ -53,7 +54,7 @@ def sidebar_config(config=None):
     if analysis_type == "Options Trading Strategy":
         strategy_type = st.sidebar.selectbox(
             "Trading Timeframe:",
-            ["Short-Term (1-7 days)", "Medium-Term (1-4 weeks)", "Long-Term (1-3 months)"],
+            ["Short-Term (1-7 days)", "Medium-Term (1-3 weeks)"],
             index=1
         )
         
@@ -63,23 +64,17 @@ def sidebar_config(config=None):
         
         # Show the types of strategies that may be considered
         with st.sidebar.expander("What strategies will be considered?"):
+            strategy_names = get_strategy_names()
+            st.markdown("The AI system will analyze market conditions to select the optimal strategy from:")
+            
+            for strategy in strategy_names:
+                st.markdown(f"• **{strategy}**")
+            
             st.markdown("""
-            The AI system will analyze market conditions to select the optimal strategy from:
-            
-            **Directional Strategies:**
-            - Long Calls/Puts
-            - Debit Spreads
-            - LEAPS Options
-            
-            **Income Strategies:**
-            - Credit Spreads
-            - Cash-Secured Puts
-            - Covered Calls
-            
-            **Volatility Strategies:**
-            - Iron Condor
-            - Butterfly Spread
-            - Calendar Spread
+            Each strategy includes multiple timeframes:
+            - **Short-Term (1–7 days)**: Quick moves and scalping
+            - **Medium-Term (1–3 weeks)**: Trend-following and income generation
+            - **Intraday**: Minutes to hours for day trading
             """)
             
         # The AI now uses a comprehensive approach combining all strike selection methods
@@ -88,12 +83,12 @@ def sidebar_config(config=None):
     elif analysis_type == "Stock Buy/Hold/Sell":
         strategy_type = st.sidebar.selectbox(
             "Trading Timeframe:",
-            ["Short-Term (1-7 days)", "Long-Term (1-3 weeks)", "Custom"],
+            ["Short-Term (1-7 days)", "Medium-Term (1-3 weeks)"],
             index=1
         )
         if "Short-Term" in strategy_type:
             options_strategy = "Day Trading"
-        elif "Long-Term" in strategy_type:
+        elif "Medium-Term" in strategy_type:
             options_strategy = "Swing Trading"
     
     # Options Priority Checkbox

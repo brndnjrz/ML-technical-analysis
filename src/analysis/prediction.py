@@ -12,14 +12,10 @@ from sklearn.model_selection import TimeSeriesSplit
 from sklearn.metrics import mean_squared_error
 import logging
 
-# Set up logging configuration
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
+# Use centralized logging config
 logger = logging.getLogger(__name__)
 
-from src.market_regime import generate_regime_specific_features, detect_market_regime, volatility_regime_features
+from .market_regime import generate_regime_specific_features, detect_market_regime, volatility_regime_features
 
 def engineer_features(data: pd.DataFrame) -> pd.DataFrame:
     """Create advanced technical and price action features for prediction."""
@@ -850,7 +846,7 @@ def create_strategy_features(data: pd.DataFrame, strategy_type: str) -> pd.DataF
             'momentum_confirm': (df['RSI_14'] > 40) & (df['RSI_14'] < 70)
         },
         
-        "Iron Condor": {
+        "Iron Condors": {
             'volatility_high': df['ATR'] > df['ATR'].rolling(20).mean(),
             'range_bound': (df['Close'] > df['BB_lower']) & (df['Close'] < df['BB_upper']),
             'trend_weak': df['ADX'] < 25

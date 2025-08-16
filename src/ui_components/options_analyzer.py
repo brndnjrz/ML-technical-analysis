@@ -39,7 +39,7 @@ def display_options_analyzer(ticker: str, data: pd.DataFrame, options_data: Opti
                 if not isinstance(strategy_config, dict):
                     st.warning("Strategy configuration data is invalid. Using default settings.")
                     strategy_config = {
-                        "strategy": "Long Call",
+                        "strategy": "Day Trading Calls/Puts",
                         "parameters": {
                             "strike": data['Close'].iloc[-1] * 1.05,
                             "contracts": 1
@@ -96,8 +96,8 @@ def display_strategy_payoff(strategy_config: Dict[str, Any], current_price: floa
         st.error("Invalid current price")
         current_price = 100  # Fallback to a reasonable default
     
-    # Get strategy details with safe defaults
-    strategy_type = strategy_config.get('strategy_type', 'Long Call')
+    # Get strategy details with safe defaults (only approved strategies)
+    strategy_type = strategy_config.get('strategy_type', 'Day Trading Calls/Puts')
     category = strategy_config.get('category', 'Directional')
     parameters = strategy_config.get('parameters', {})
     
@@ -124,38 +124,51 @@ def display_strategy_payoff(strategy_config: Dict[str, Any], current_price: floa
     # For strategies with width between strikes
     width = parameters.get('width', 5)
     
-    # Calculate break-even points and payoffs based on strategy type
-    if strategy_type == "Long Call":
+    # Calculate break-even points and payoffs based on strategy type (only approved strategies)
+    if strategy_type == "Day Trading Calls/Puts":
         strike = current_price
         premium = current_price * 0.03  # Estimated premium
         
+        # Assume call for demonstration (could be put based on market direction)
         payoffs = np.maximum(prices - strike, 0) - premium
         break_even = strike + premium
         
-    elif strategy_type == "Long Put":
-        strike = current_price
-        premium = current_price * 0.03  # Estimated premium
+    elif strategy_type == "Covered Calls":
+        strike = current_price * 1.05  # OTM strike
+        premium = current_price * 0.02  # Premium received
         
-        payoffs = np.maximum(strike - prices, 0) - premium
+        # Long stock + short call
+        stock_payoff = prices - current_price
+        call_payoff = -np.maximum(prices - strike, 0) + premium
+        payoffs = stock_payoff + call_payoff
+        break_even = current_price - premium
+        
+    elif strategy_type == "Cash-Secured Puts":
+        strike = current_price * 0.95  # OTM put
+        premium = current_price * 0.02  # Premium received
+        
+        payoffs = -np.maximum(strike - prices, 0) + premium
         break_even = strike - premium
         
-    elif strategy_type == "Bull Call Spread":
-        lower_strike = current_price
-        upper_strike = current_price + width
-        premium = width * 0.4  # Estimated net premium
+    elif strategy_type == "Credit Spreads":
+        lower_strike = current_price * 0.95
+        upper_strike = current_price * 1.05
+        width = upper_strike - lower_strike
+        premium = width * 0.3  # Net credit received
         
-        payoffs = np.minimum(np.maximum(prices - lower_strike, 0), upper_strike - lower_strike) - premium
+        # Bear call spread example
+        payoffs = premium - np.maximum(np.minimum(prices - lower_strike, width), 0)
         break_even = lower_strike + premium
         
-    elif strategy_type == "Bear Put Spread":
-        upper_strike = current_price + width/2
-        lower_strike = current_price - width/2
-        premium = width * 0.4  # Estimated net premium
+    elif strategy_type == "Swing Trading":
+        # Simplified as long position with options characteristics
+        strike = current_price
+        premium = current_price * 0.05  # Estimated cost
         
-        payoffs = np.minimum(np.maximum(upper_strike - prices, 0), upper_strike - lower_strike) - premium
-        break_even = upper_strike - premium
+        payoffs = (prices - current_price) - premium
+        break_even = current_price + premium
         
-    elif strategy_type == "Iron Condor":
+    elif strategy_type == "Iron Condors":
         middle = current_price
         put_spread_width = width
         call_spread_width = width
@@ -235,36 +248,88 @@ def display_strategy_payoff(strategy_config: Dict[str, Any], current_price: floa
     st.subheader("Strategy Overview")
     
     strategy_explanations = {
-        "Long Call": """
-            **Long Call Strategy**
+        "Day Trading Calls/Puts": """
+            **Day Trading Calls/Puts Strategy**
             
-            This is a bullish strategy where you purchase a call option, giving you the right to buy the stock at the strike price.
-            
-            **When to use:**
-            - You expect the stock to rise significantly
-            - You want to limit risk while maintaining unlimited upside potential
-            - You prefer defined risk with leverage
-            
-            **Risks:**
-            - Time decay works against this position
-            - Requires significant price movement to overcome premium paid
-        """,
-        "Long Put": """
-            **Long Put Strategy**
-            
-            This is a bearish strategy where you purchase a put option, giving you the right to sell the stock at the strike price.
+            This strategy involves buying and selling options within the same trading day to capitalize on short-term price movements.
             
             **When to use:**
-            - You expect the stock to decline significantly
-            - You want protection against downside risk (as a hedge)
-            - You prefer defined risk with leverage
+            - High intraday volatility expected
+            - Strong momentum and volume patterns
+            - Clear directional bias with technical confirmation
             
             **Risks:**
-            - Time decay works against this position
-            - Requires significant price movement to overcome premium paid
+            - Time decay accelerates on short expirations
+            - Requires active monitoring and quick decision making
+            - High risk due to rapid price changes
         """,
-        "Iron Condor": """
-            **Iron Condor Strategy**
+        
+        "Covered Calls": """
+            **Covered Calls Strategy**
+            
+            This income strategy involves owning the underlying stock and selling call options against your position.
+            
+            **When to use:**
+            - You own the stock and expect sideways to moderate upward movement
+            - You want to generate additional income from your holdings
+            - Market volatility is elevated, increasing option premiums
+            
+            **Risks:**
+            - Limits upside potential if stock rallies strongly
+            - Stock can still decline despite premium received
+            - May face early assignment
+        """,
+        
+        "Cash-Secured Puts": """
+            **Cash-Secured Puts Strategy**
+            
+            This strategy involves selling put options while holding enough cash to purchase the stock if assigned.
+            
+            **When to use:**
+            - You want to potentially acquire stock at a discount
+            - You're neutral to bullish on the underlying
+            - Implied volatility is high, providing attractive premiums
+            
+            **Risks:**
+            - Unlimited downside risk below strike price
+            - Opportunity cost if stock rises significantly
+            - Requires substantial capital commitment
+        """,
+        
+        "Credit Spreads": """
+            **Credit Spreads Strategy**
+            
+            This strategy involves selling a higher premium option and buying a lower premium option for a net credit.
+            
+            **When to use:**
+            - You have a directional bias but want defined risk
+            - High implied volatility provides attractive premium
+            - You expect time decay to work in your favor
+            
+            **Risks:**
+            - Limited profit potential
+            - Losses can occur quickly if direction is wrong
+            - May require early management if tested
+        """,
+        
+        "Swing Trading": """
+            **Swing Trading Strategy**
+            
+            This strategy involves holding positions for several days to weeks to capture intermediate price swings.
+            
+            **When to use:**
+            - Clear trend patterns and technical setups
+            - Moderate volatility with defined support/resistance
+            - Time to monitor positions but not day-trade
+            
+            **Risks:**
+            - Overnight and weekend gap risk
+            - Trend reversals can cause significant losses
+            - Requires patience and discipline
+        """,
+        
+        "Iron Condors": """
+            **Iron Condors Strategy**
             
             This is a neutral strategy consisting of a bull put spread and a bear call spread, creating a range where you profit if the stock stays between the short strikes.
             

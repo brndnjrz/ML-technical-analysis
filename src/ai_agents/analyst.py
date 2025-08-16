@@ -177,9 +177,9 @@ class AnalystAgent:
         patterns = []
         try:
             # Strategy-aware pattern recognition
-            patterns.extend(self._find_volatility_patterns(data))  # For Straddle/Strangle strategies
+            patterns.extend(self._find_volatility_patterns(data))  # For Day Trading Calls/Puts strategies
             patterns.extend(self._find_trend_patterns(data))       # For Swing Trading, Day Trading
-            patterns.extend(self._find_range_patterns(data))       # For Iron Condor, Butterfly
+            patterns.extend(self._find_range_patterns(data))       # For Iron Condors, Credit Spreads
             patterns.extend(self._find_breakout_patterns(data))    # For momentum strategies
             
             # Original patterns
@@ -192,7 +192,7 @@ class AnalystAgent:
         return patterns
     
     def _find_volatility_patterns(self, data: pd.DataFrame) -> List[Dict[str, Any]]:
-        """Identify volatility patterns relevant for Straddle/Strangle strategies."""
+        """Identify volatility patterns relevant for Day Trading Calls/Puts strategies."""
         patterns = []
         try:
             # Calculate volatility compression/expansion
@@ -205,7 +205,7 @@ class AnalystAgent:
                 if current_atr < avg_atr * 0.7:  # Volatility compression
                     patterns.append({
                         'pattern': 'Volatility Compression',
-                        'strategy_relevance': ['Straddle/Strangle', 'Calendar Spreads'],
+                        'strategy_relevance': ['Day Trading Calls/Puts', 'Credit Spreads'],
                         'description': 'Low volatility may precede expansion',
                         'confidence': 0.7,
                         'time_horizon': 'short_term'
@@ -266,7 +266,7 @@ class AnalystAgent:
                 if avg_range < current_range * 0.3:  # Low range variance = consolidation
                     patterns.append({
                         'pattern': 'Range-Bound Consolidation',
-                        'strategy_relevance': ['Iron Condor', 'Butterfly Spread', 'Calendar Spreads'],
+                        'strategy_relevance': ['Iron Condors', 'Credit Spreads', 'Covered Calls'],
                         'description': 'Price consolidating in tight range',
                         'confidence': 0.75,
                         'time_horizon': 'short_to_medium_term'

@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from typing import Dict, Any, List, Optional
+from ..trading_strategies import strategies_data, get_strategy_names, get_strategy_by_name, get_timeframes_for_strategy
 
 def display_options_strategy_selector(data: pd.DataFrame, ticker: str) -> Dict[str, Any]:
     """
@@ -41,46 +42,80 @@ def display_options_strategy_selector(data: pd.DataFrame, ticker: str) -> Dict[s
     # Strategy selection
     st.markdown("### Strategy Selection")
     
+    # Get available strategies from the new format
+    available_strategies = get_strategy_names()
+    
+    # Create a selectbox for strategy selection
+    selected_strategy_name = st.selectbox("Select Trading Strategy", available_strategies)
+    
+    # Get the selected strategy data
+    selected_strategy = get_strategy_by_name(selected_strategy_name)
+    
+    if selected_strategy:
+        # Get available timeframes for the selected strategy
+        available_timeframes = get_timeframes_for_strategy(selected_strategy_name)
+        
+        if available_timeframes:
+            # Timeframe selection
+            selected_timeframe = st.selectbox("Select Timeframe", available_timeframes)
+            
+            # Display strategy details for the selected timeframe
+            timeframe_data = selected_strategy['Timeframes'][selected_timeframe]
+            
+            # Show strategy information
+            st.markdown(f"### {selected_strategy_name} - {selected_timeframe}")
+            
+            # Best use case
+            st.markdown("**Best Use:**")
+            st.write(timeframe_data.get('Best_Use', 'No description available'))
+            
+            # Key indicators
+            st.markdown("**Key Indicators:**")
+            key_indicators = timeframe_data.get('Key_Indicators', [])
+            for indicator in key_indicators:
+                st.write(f"• {indicator}")
+            
+            # Advanced tips
+            with st.expander("💡 Advanced Tips"):
+                advanced_tips = timeframe_data.get('Advanced_Tips', [])
+                for tip in advanced_tips:
+                    st.write(f"• {tip}")
+    
+    # Legacy strategy categories for backwards compatibility
+    st.markdown("---")
+    st.markdown("### Alternative Strategy Categories")
+    
     strategy_categories = [
-        "Bullish Strategies",
+        "Bullish Strategies", 
         "Bearish Strategies",
         "Neutral Strategies",
         "Volatility Strategies"
     ]
     
-    category = st.selectbox("Strategy Category", strategy_categories)
+    category = st.selectbox("Legacy Strategy Category", strategy_categories)
     
-    # Define strategies for each category
-    strategies = {
+    # Define strategies for each category (only using the 6 approved strategies)
+    legacy_strategies = {
         "Bullish Strategies": [
-            "Long Call",
-            "Bull Call Spread",
-            "Bull Put Spread",
-            "Call Debit Spread",
-            "LEAPS Call"
+            "Covered Calls",
+            "Swing Trading"
         ],
         "Bearish Strategies": [
-            "Long Put",
-            "Bear Put Spread", 
-            "Bear Call Spread",
-            "Put Debit Spread",
-            "LEAPS Put"
+            "Cash-Secured Puts",
+            "Credit Spreads"
         ],
         "Neutral Strategies": [
-            "Iron Condor",
-            "Iron Butterfly",
-            "Short Straddle",
-            "Calendar Spread"
+            "Iron Condors",
+            "Credit Spreads"
         ],
         "Volatility Strategies": [
-            "Long Straddle",
-            "Long Strangle",
-            "Butterfly Spread"
+            "Day Trading Calls/Puts",
+            "Iron Condors"
         ]
     }
     
     # Strategy selector
-    strategy = st.selectbox("Select Strategy", strategies[category])
+    legacy_strategy = st.selectbox("Select Legacy Strategy", legacy_strategies[category])
     
     # Standard deviation based strikes
     if 'HV_20' in volatility:
@@ -108,13 +143,13 @@ def display_options_strategy_selector(data: pd.DataFrame, ticker: str) -> Dict[s
     expiration = st.selectbox("Expiration", expiration_options)
     
     # Strategy specific parameters
-    if "Spread" in strategy or "Iron" in strategy:
+    if "Spread" in legacy_strategy or "Iron" in legacy_strategy:
         col1, col2 = st.columns(2)
         with col1:
             width = st.slider("Width Between Strikes ($)", 1, 20, 5)
         with col2:
             contracts = st.number_input("Number of Contracts", 1, 100, 1)
-    elif "Long" in strategy:
+    elif "Long" in legacy_strategy:
         contracts = st.number_input("Number of Contracts", 1, 100, 1)
     
     # Risk analysis
@@ -122,8 +157,8 @@ def display_options_strategy_selector(data: pd.DataFrame, ticker: str) -> Dict[s
     
     # Different metrics based on strategy type
     if category in ["Bullish Strategies", "Bearish Strategies"]:
-        max_loss = contracts * 100 * width if "Spread" in strategy else contracts * 100 * current_price * 0.05
-        max_profit = "Unlimited" if "Long" in strategy and "Spread" not in strategy else contracts * 100 * width
+        max_loss = contracts * 100 * width if "Spread" in legacy_strategy else contracts * 100 * current_price * 0.05
+        max_profit = "Unlimited" if "Long" in legacy_strategy and "Spread" not in legacy_strategy else contracts * 100 * width
         
         col1, col2 = st.columns(2)
         with col1:
@@ -133,7 +168,7 @@ def display_options_strategy_selector(data: pd.DataFrame, ticker: str) -> Dict[s
                 st.metric("Max Profit", max_profit)
             else:
                 st.metric("Max Profit", f"${max_profit:.2f}")
-    elif "Iron Condor" in strategy:
+    elif "Iron Condor" in legacy_strategy:
         max_loss = contracts * 100 * width
         max_profit = contracts * 100 * (width * 0.4)  # Typical credit is ~40% of width
         
@@ -147,12 +182,14 @@ def display_options_strategy_selector(data: pd.DataFrame, ticker: str) -> Dict[s
     
     # Return strategy configuration
     return {
-        "strategy_type": strategy,
+        "strategy_type": selected_strategy_name if selected_strategy else legacy_strategy,
         "category": category,
         "expiration": expiration,
         "current_price": current_price,
+        "timeframe": selected_timeframe if 'selected_timeframe' in locals() else None,
+        "strategy_data": selected_strategy if selected_strategy else None,
         "parameters": {
-            "width": width if "Spread" in strategy or "Iron" in strategy else None,
+            "width": width if "Spread" in legacy_strategy or "Iron" in legacy_strategy else None,
             "contracts": contracts,
             "std_dev_strikes": std_dev_strikes if 'HV_20' in volatility else None
         }
