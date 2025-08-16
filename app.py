@@ -38,7 +38,7 @@ logging.getLogger('requests').setLevel(logging.WARNING)
 cleanup_old_temp_files()
 
 def format_analysis_text(text):
-    """Clean and format analysis text for better readability"""
+    """Clean and format analysis text for better readability in professional report style"""
     if not text:
         return "No analysis available"
     
@@ -83,7 +83,7 @@ def format_analysis_text(text):
                     else:
                         formatted_value = "Not specified"
                 
-                formatted_lines.append(f"- **{formatted_key}:** {formatted_value}")
+                formatted_lines.append(f"* **{formatted_key}:** {formatted_value}")
             
             return '\n'.join(formatted_lines)
             
@@ -98,6 +98,130 @@ def format_analysis_text(text):
     text = re.sub(r'([🤖📊💡📈👁️⚠️].+?)(\n)([^-•\s])', r'\1\n\n\3', text)
     
     return text.strip()
+
+
+def format_professional_report(analysis, recommendation, ticker, strategy_type, options_strategy, data, levels, options_data):
+    """Format analysis into a professional trade signal report"""
+    try:
+        # Get current market data
+        current_price = data['Close'].iloc[-1] if not data.empty else 0
+        current_rsi = data.get('RSI', pd.Series([50])).iloc[-1] if 'RSI' in data.columns else 50
+        current_macd = data.get('MACD', pd.Series([0])).iloc[-1] if 'MACD' in data.columns else 0
+        current_adx = data.get('ADX', pd.Series([25])).iloc[-1] if 'ADX' in data.columns else 25
+        current_atr = data.get('ATR', pd.Series([1])).iloc[-1] if 'ATR' in data.columns else 1
+        current_vwap = data.get('VWAP', pd.Series([current_price])).iloc[-1] if 'VWAP' in data.columns else current_price
+        
+        # Get Bollinger Bands
+        bb_upper = data.get('BB_upper', pd.Series([current_price * 1.02])).iloc[-1] if 'BB_upper' in data.columns else current_price * 1.02
+        bb_lower = data.get('BB_lower', pd.Series([current_price * 0.98])).iloc[-1] if 'BB_lower' in data.columns else current_price * 0.98
+        
+        # Get support/resistance levels
+        nearest_support = max([s for s in levels.get('support', []) if s < current_price], default=current_price * 0.95)
+        nearest_resistance = min([r for r in levels.get('resistance', []) if r > current_price], default=current_price * 1.05)
+        
+        # Get options data
+        iv_rank = options_data.get('iv_data', {}).get('iv_rank', 0) if options_data else 0
+        iv_percentile = options_data.get('iv_data', {}).get('iv_percentile', 0) if options_data else 0
+        vix = options_data.get('iv_data', {}).get('vix', 20) if options_data else 20
+        
+        # Extract recommendation details
+        action = recommendation.get('action', 'HOLD').upper() if recommendation else 'HOLD'
+        confidence = recommendation.get('strategy', {}).get('confidence', 0.5) * 100 if recommendation else 50
+        strategy_name = recommendation.get('strategy', {}).get('name', 'Unknown') if recommendation else options_strategy or 'Unknown'
+        
+        # Determine risk level
+        risk_level = "Low" if iv_rank < 30 and current_atr < current_price * 0.02 else "Medium" if iv_rank < 60 else "High"
+        
+        # RSI interpretation
+        rsi_status = "Oversold" if current_rsi < 30 else "Overbought" if current_rsi > 70 else "Neutral"
+        rsi_signal = "→ Potential bounce up." if current_rsi < 30 else "→ Potential pullback." if current_rsi > 70 else "→ Balanced momentum."
+        
+        # MACD interpretation
+        macd_status = "Bullish" if current_macd > 0 else "Bearish"
+        macd_signal = "(trend continuation confirmed)" if abs(current_macd) > 0.1 else "(weak signal)"
+        
+        # ADX interpretation
+        trend_strength = "Strong" if current_adx > 25 else "Weak/moderate"
+        
+        # Volume analysis
+        volume_status = "High" if 'Volume' in data.columns and data['Volume'].iloc[-1] > data['Volume'].rolling(20).mean().iloc[-1] else "Normal"
+        volume_signal = "(strong participation)" if volume_status == "High" else "(moderate participation)"
+        
+        # Calculate stop loss and profit targets
+        stop_loss = max(nearest_support, current_price - current_atr * 2)
+        profit_target = min(nearest_resistance, current_price + current_atr * 3)
+        
+        # Format the professional report
+        report = f"""# 📊 AI-Powered Stock Analysis Report
+
+**Ticker:** {ticker.upper()}
+**Strategy Type:** {strategy_type}
+**Options Strategy:** {strategy_name}
+**Confidence:** {confidence:.0f}%
+**Risk Level:** {risk_level}
+
+---
+
+## 🔎 Market Overview
+
+* **RSI:** {current_rsi:.2f} → {rsi_status} {rsi_signal}
+* **MACD:** {macd_status} {macd_signal}
+* **Volume:** {volume_status} {volume_signal}
+* **ADX (Trend Strength):** {current_adx:.2f} → {trend_strength} trend forming.
+
+---
+
+## 📈 Technical Levels
+
+* **Current Price:** ${current_price:.2f}
+* **Support:** ${nearest_support:.2f}
+* **Resistance:** ${nearest_resistance:.2f}
+* **VWAP:** ${current_vwap:.2f}
+* **Bollinger Bands:** ${bb_lower:.2f} – ${bb_upper:.2f}
+
+---
+
+## 🎯 Trade Parameters
+
+* **Entry Condition:** Price above key technical levels
+* **Exit Condition:** Price closes below support or hits target
+* **Stop Loss:** ${stop_loss:.2f} (${stop_loss - current_price:.2f} from current)
+* **Profit Target:** ${profit_target:.2f} (+${profit_target - current_price:.2f} upside)
+* **Trailing Stop:** Active (lock in gains if price rises)
+
+---
+
+## ⚖️ Risk Assessment
+
+* **RSI Level:** {rsi_status} suggests {"limited upside" if current_rsi > 70 else "potential upside" if current_rsi < 30 else "balanced risk/reward"}.
+* **Volatility Risk:** {risk_level} → IV Rank {iv_rank:.1f}%, IV Percentile {iv_percentile:.1f}%.
+* **ATR (Daily Move):** ${current_atr:.2f} → expect {"small" if current_atr < current_price * 0.015 else "moderate" if current_atr < current_price * 0.03 else "large"} daily swings.
+* **VIX:** {vix:.1f} → market-wide volatility {"low" if vix < 15 else "moderate" if vix < 25 else "high"}.
+
+---
+
+## ✅ Recommendation
+
+* **{action}:** {"Trend-following setup supports" if action == "BUY" else "Technical signals suggest" if action == "SELL" else "Neutral signals recommend"} a {action.lower()} position.
+* **Stop:** Place {'below' if action == 'BUY' else 'above'} ${stop_loss:.2f} (to limit downside).
+* **Take Profit:** ${profit_target:.2f} zone.
+* **Options Play:** {"Call strategies preferred" if action == "BUY" else "Put strategies preferred" if action == "SELL" else "Neutral strategies recommended"} in {"low" if iv_rank < 30 else "high"} IV environment.
+
+---
+
+## ⚠️ Risk Warning
+
+This is AI-generated analysis for **educational purposes only**.
+Always perform your own due diligence. Not financial advice.
+
+---
+"""
+        
+        return report
+        
+    except Exception as e:
+        print(f"Error formatting professional report: {e}")
+        return format_analysis_text(analysis) if analysis else "Report formatting error occurred."
 
 # Set Up Streamlit App UI 
 st.set_page_config(page_title="AI Technical Analysis", layout="wide")
@@ -866,56 +990,27 @@ PRICE CHANGE: ${price_change:.2f} ({(price_change/data['Close'].iloc[-1]*100):.1
                     
                     st.write(f"• **{formatted_key}:** {value_display}")
         
-        # Enhanced Analysis Display
-        st.markdown("#### 📝 Detailed Analysis")
+        # Professional Analysis Display
+        st.markdown("#### 📝 Professional Trade Report")
         
-        # Clean up the analysis text and format it better
-        if analysis:
-            # Clean and format the analysis text
-            cleaned_analysis = format_analysis_text(analysis)
+        # Use the new professional formatting function
+        try:
+            professional_report = format_professional_report(
+                analysis, recommendation, ticker, strategy_type, options_strategy, 
+                data, levels, options_data
+            )
             
-            # Split analysis into sections for better formatting
-            sections = cleaned_analysis.split('\n\n')
+            # Display the professional report
+            st.markdown(professional_report)
             
-            for i, section in enumerate(sections):
-                if section.strip():
-                    # Check if it's a header-like section with emoji
-                    if any(emoji in section for emoji in ['🤖', '📊', '💡', '📈', '👁️', '⚠️', '🔍']):
-                        lines = section.strip().split('\n')
-                        if len(lines) > 1:
-                            header = lines[0].strip()
-                            content = '\n'.join(lines[1:]).strip()
-                            
-                            # Use expander for long sections, regular markdown for short ones
-                            if len(content) > 200:
-                                with st.expander(header, expanded=i < 2):  # Expand first two sections
-                                    if content:
-                                        # Format bullet points and content
-                                        formatted_content = content.replace('- ', '• ').replace('*', '')
-                                        st.markdown(formatted_content)
-                            else:
-                                st.markdown(f"**{header}**")
-                                if content:
-                                    formatted_content = content.replace('- ', '• ').replace('*', '')
-                                    st.markdown(formatted_content)
-                                st.markdown("---")  # Add separator
-                        else:
-                            st.markdown(f"### {section.strip()}")
-                    else:
-                        # Regular content formatting
-                        if section.strip().startswith('-') or section.strip().startswith('•'):
-                            # Format as bullet points in an info box
-                            bullet_points = section.strip().replace('- ', '• ').replace('*', '')
-                            st.info(bullet_points)
-                        elif len(section.strip()) > 100:
-                            # Long text in a container
-                            with st.container():
-                                st.markdown(section.strip().replace('*', ''))
-                        else:
-                            # Short text as regular markdown
-                            st.markdown(section.strip().replace('*', ''))
-        else:
-            st.info("📝 No detailed analysis available. Please run the analysis to get AI insights.")
+        except Exception as format_error:
+            st.warning("⚠️ Error formatting professional report. Showing standard format.")
+            # Fallback to original formatting
+            if analysis:
+                cleaned_analysis = format_analysis_text(analysis)
+                st.markdown(cleaned_analysis)
+            else:
+                st.info("📝 No detailed analysis available. Please run the analysis to get AI insights.")
         
         # Action Buttons Section
         st.markdown("---")
@@ -928,8 +1023,14 @@ PRICE CHANGE: ${price_change:.2f} ({(price_change/data['Close'].iloc[-1]*100):.1
             if st.button("📄 Generate Detailed Report", use_container_width=True):
                 with st.spinner("Generating comprehensive report..."):
                     try:
+                        # Generate professional report for PDF
+                        professional_report = format_professional_report(
+                            analysis, recommendation, ticker, strategy_type, options_strategy, 
+                            data, levels, options_data
+                        )
+                        
                         generate_and_display_pdf(
-                            ticker, strategy_type, options_strategy, data, analysis, chart_path, levels, options_data, st.session_state["active_indicators"]
+                            ticker, strategy_type, options_strategy, data, professional_report, chart_path, levels, options_data, st.session_state["active_indicators"]
                         )
                         st.success("✅ PDF report generated successfully!")
                         print("✅ PDF report generated successfully")
