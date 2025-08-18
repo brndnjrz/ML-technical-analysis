@@ -7,6 +7,7 @@ from .strategy import StrategyAgent
 from .execution import ExecutionAgent
 from .backtest import BacktestAgent
 from ..trading_strategies import strategies_data
+from ..utils.metrics import log_prediction
 
 # Setup logger for AI agents
 logger = logging.getLogger(__name__)
@@ -41,6 +42,280 @@ class HedgeFundAI:
             'min_confidence': 0.5       # 50% minimum confidence for trades
         }
     
+    def detect_regime(self, data: pd.DataFrame, ticker: str = "", options_data: Dict[str, Any] = None) -> str:
+        """
+        Detect current market regime for regime-aware analysis
+        
+        Returns:
+            str: 'trend', 'range', or 'event'
+        """
+        try:
+            if len(data) < 50:
+                logger.warning("⚠️ Insufficient data for regime detection, defaulting to 'range'")
+                return 'range'
+            
+            # Get technical indicators
+            current_price = data['Close'].iloc[-1]
+            
+            # ADX for trend strength (try multiple column names)
+            adx = 20.0  # Default
+            for adx_col in ['ADX', 'ADX_14', 'ADX_1d']:
+                if adx_col in data.columns:
+                    adx = data[adx_col].iloc[-1]
+                    break
+            
+            # Moving average slope for trend direction
+            if 'SMA_20' in data.columns or 'EMA_20' in data.columns:
+                ma_col = 'SMA_20' if 'SMA_20' in data.columns else 'EMA_20'
+                ma_current = data[ma_col].iloc[-1]
+                ma_prev = data[ma_col].iloc[-6] if len(data) > 6 else ma_current  # 5-day slope
+                ma_slope = (ma_current - ma_prev) / ma_prev if ma_prev != 0 else 0
+                slope_threshold = 0.02  # 2% change over 5 days
+            else:
+                # Fallback: price slope
+                price_prev = data['Close'].iloc[-6] if len(data) > 6 else current_price
+                ma_slope = (current_price - price_prev) / price_prev if price_prev != 0 else 0
+                slope_threshold = 0.03  # 3% price change
+            
+            # Bollinger Band position for range detection
+            bb_position = 0.5  # Default neutral
+            if 'BB_upper' in data.columns and 'BB_lower' in data.columns:
+                bb_upper = data['BB_upper'].iloc[-1]
+                bb_lower = data['BB_lower'].iloc[-1]
+                if bb_upper != bb_lower:
+                    bb_position = (current_price - bb_lower) / (bb_upper - bb_lower)
+            
+            # Realized volatility vs Implied volatility for event detection
+            realized_vol = data['Close'].pct_change().rolling(20).std().iloc[-1] * np.sqrt(252) if len(data) > 20 else 0.2
+            implied_vol = 0.2  # Default
+            
+            if options_data and 'iv_data' in options_data:
+                iv_data = options_data['iv_data']
+                if 'iv_percentile' in iv_data:
+                    implied_vol = iv_data['iv_percentile'] / 100
+                elif 'hv_30' in iv_data:
+                    implied_vol = iv_data['hv_30'] / 100
+            
+            vol_ratio = implied_vol / realized_vol if realized_vol > 0 else 1.0
+            
+            # Check for upcoming events (earnings, etc.)
+            # This is a placeholder - in production, you'd check an events calendar
+            days_to_earnings = self._estimate_days_to_earnings(ticker)  # Simplified
+            
+            # REGIME DECISION LOGIC
+            
+            # Event regime: High IV vs RV or near earnings
+            if vol_ratio > 1.4 or days_to_earnings <= 7:
+                regime = 'event'
+                logger.info(f"📅 REGIME: Event ({ticker}) - IV/RV: {vol_ratio:.2f}, Days to earnings: ~{days_to_earnings}")
+            
+            # Trend regime: Strong ADX + significant slope
+            elif adx >= 20 and abs(ma_slope) > slope_threshold:
+                regime = 'trend'
+                logger.info(f"📈 REGIME: Trend ({ticker}) - ADX: {adx:.1f}, Slope: {ma_slope*100:.1f}%")
+            
+            # Range regime: Low ADX + oscillatory price action
+            else:
+                regime = 'range'
+                logger.info(f"📊 REGIME: Range ({ticker}) - ADX: {adx:.1f}, BB Position: {bb_position:.2f}")
+            
+            return regime
+            
+        except Exception as e:
+            logger.error(f"❌ Regime detection error: {e}")
+            return 'range'  # Safe default
+    
+    def _estimate_days_to_earnings(self, ticker: str) -> int:
+        """
+        Estimate days until next earnings announcement
+        This is a simplified placeholder - in production, use actual earnings calendar
+        """
+        # Most companies report quarterly, roughly every 90 days
+        # This is a simplified heuristic
+        import hashlib
+        hash_val = int(hashlib.md5(ticker.encode()).hexdigest(), 16)
+        return (hash_val % 90) + 1  # Random but deterministic per ticker
+    
+    def fuse_agent_probabilities(self, analyst_view: Dict[str, Any], 
+                                vision_analysis: Dict[str, Any] = None, 
+                                regime: str = 'range') -> Dict[str, float]:
+        """
+        Fuse quantitative and vision analysis using regime-aware weights
+        
+        Returns calibrated probabilities for directional and range predictions
+        """
+        try:
+            # Extract quantitative signals
+            quant_up_prob = self._extract_quant_up_probability(analyst_view)
+            quant_inside_prob = self._extract_quant_inside_probability(analyst_view)
+            
+            # Extract vision signals (if available)
+            vision_up_prob = 0.5
+            vision_inside_prob = 0.5
+            vision_confidence = 0.0
+            
+            if vision_analysis:
+                vision_up_prob = self._extract_vision_up_probability(vision_analysis)
+                vision_inside_prob = self._extract_vision_inside_probability(vision_analysis)
+                vision_confidence = vision_analysis.get('confidence', 0.0)
+            
+            # Regime-specific weights
+            regime_weights = {
+                'trend': {'quant': 0.7, 'vision': 0.3},
+                'range': {'quant': 0.45, 'vision': 0.55},
+                'event': {'quant': 0.6, 'vision': 0.4}
+            }
+            
+            weights = regime_weights.get(regime, regime_weights['range'])
+            
+            # Apply vision confidence scaling
+            effective_vision_weight = weights['vision'] * max(0.1, vision_confidence)
+            effective_quant_weight = 1.0 - effective_vision_weight
+            
+            # Fused probabilities
+            fused_up_prob = (
+                effective_quant_weight * quant_up_prob + 
+                effective_vision_weight * vision_up_prob
+            )
+            
+            fused_inside_prob = (
+                effective_quant_weight * quant_inside_prob + 
+                effective_vision_weight * vision_inside_prob
+            )
+            
+            # Apply regime adjustments
+            if regime == 'trend':
+                # In trending markets, reduce inside probability
+                fused_inside_prob *= 0.8
+            elif regime == 'range':
+                # In ranging markets, increase inside probability
+                fused_inside_prob = min(0.9, fused_inside_prob * 1.2)
+            elif regime == 'event':
+                # In event-driven markets, increase uncertainty
+                fused_up_prob = 0.3 * fused_up_prob + 0.7 * 0.5  # Pull toward neutral
+            
+            logger.info(f"🔗 FUSION ({regime}): Up={fused_up_prob:.3f}, Inside={fused_inside_prob:.3f} "
+                       f"[Weights: Q={effective_quant_weight:.2f}, V={effective_vision_weight:.2f}]")
+            
+            return {
+                'up_probability': np.clip(fused_up_prob, 0.1, 0.9),
+                'inside_probability': np.clip(fused_inside_prob, 0.1, 0.9),
+                'regime': regime,
+                'quant_weight': effective_quant_weight,
+                'vision_weight': effective_vision_weight,
+                'vision_confidence': vision_confidence
+            }
+            
+        except Exception as e:
+            logger.error(f"❌ Fusion error: {e}")
+            return {
+                'up_probability': 0.5,
+                'inside_probability': 0.5,
+                'regime': regime,
+                'quant_weight': 1.0,
+                'vision_weight': 0.0,
+                'vision_confidence': 0.0
+            }
+    
+    def _extract_quant_up_probability(self, analyst_view: Dict[str, Any]) -> float:
+        """Convert quantitative signals to up probability"""
+        try:
+            # Get trend and momentum indicators
+            trend_data = analyst_view.get('trend', {})
+            momentum_data = analyst_view.get('momentum', {})
+            
+            # Start with neutral
+            prob = 0.5
+            
+            # RSI contribution
+            rsi = momentum_data.get('RSI', 50)
+            if rsi < 30:
+                prob += 0.15  # Oversold bounce
+            elif rsi > 70:
+                prob -= 0.15  # Overbought pullback
+            
+            # Trend direction
+            trend_direction = trend_data.get('direction', 'neutral')
+            if trend_direction == 'bullish':
+                prob += 0.2
+            elif trend_direction == 'bearish':
+                prob -= 0.2
+            
+            # MACD signal
+            momentum_direction = momentum_data.get('direction', 'neutral')
+            if momentum_direction == 'bullish':
+                prob += 0.1
+            elif momentum_direction == 'bearish':
+                prob -= 0.1
+            
+            return np.clip(prob, 0.1, 0.9)
+            
+        except Exception as e:
+            logger.error(f"❌ Quant probability extraction error: {e}")
+            return 0.5
+    
+    def _extract_quant_inside_probability(self, analyst_view: Dict[str, Any]) -> float:
+        """Estimate range-bound probability from technical indicators"""
+        try:
+            # Default range probability
+            prob = 0.5
+            
+            # Volatility indicators suggest range-bound behavior
+            volatility_data = analyst_view.get('volatility', {})
+            
+            # If we have ADX, use it for trend strength assessment
+            trend_data = analyst_view.get('trend', {})
+            trend_strength = trend_data.get('strength', 0.5)
+            
+            # Lower trend strength = higher inside probability
+            prob = 0.8 - (trend_strength * 0.3)  # Strong trend reduces range probability
+            
+            # RSI in middle range suggests consolidation
+            momentum_data = analyst_view.get('momentum', {})
+            rsi = momentum_data.get('RSI', 50)
+            
+            if 35 <= rsi <= 65:
+                prob += 0.1  # RSI in neutral zone
+            
+            return np.clip(prob, 0.2, 0.9)
+            
+        except Exception as e:
+            logger.error(f"❌ Quant inside probability extraction error: {e}")
+            return 0.5
+    
+    def _extract_vision_up_probability(self, vision_analysis: Dict[str, Any]) -> float:
+        """Convert vision analysis to up probability"""
+        try:
+            trend = vision_analysis.get('trend', 'neutral')
+            confidence = vision_analysis.get('confidence', 0.5)
+            
+            if trend == 'bullish':
+                return 0.5 + (confidence * 0.4)  # 0.5 to 0.9
+            elif trend == 'bearish':
+                return 0.5 - (confidence * 0.4)  # 0.1 to 0.5
+            else:
+                return 0.5
+                
+        except Exception:
+            return 0.5
+    
+    def _extract_vision_inside_probability(self, vision_analysis: Dict[str, Any]) -> float:
+        """Estimate range probability from vision analysis"""
+        try:
+            # If we have clear support/resistance levels, higher inside probability
+            support_levels = vision_analysis.get('support', [])
+            resistance_levels = vision_analysis.get('resistance', [])
+            confidence = vision_analysis.get('confidence', 0.5)
+            
+            if support_levels and resistance_levels:
+                # Strong levels = higher inside probability
+                return 0.5 + (confidence * 0.3)
+            else:
+                return 0.5
+                
+        except Exception:
+            return 0.5
+    
     def analyze_and_recommend(self, data: pd.DataFrame, ticker: str, current_price: float, options_priority: bool = False, options_data: Dict[str, Any] = None) -> Dict[str, Any]:
         """
         MAIN HEDGE FUND ANALYSIS ENGINE
@@ -64,6 +339,10 @@ class HedgeFundAI:
         logger.info(f"🏛️ HEDGE FUND AI: Analyzing {ticker} at ${current_price:.2f}")
         
         try:
+            # PHASE 0: Market Regime Detection
+            logger.debug("🔍 Phase 0: Detecting market regime...")
+            regime = self.detect_regime(data, ticker, options_data)
+            
             # PHASE 1: Independent Agent Analysis
             logger.debug("📊 Phase 1: Gathering independent agent analyses...")
             
@@ -109,16 +388,38 @@ class HedgeFundAI:
                 'analyst': analyst_view,
                 'strategist': strategy_view, 
                 'executor': execution_view
-            }, data, ticker)
+            }, data, ticker, regime)  # Pass regime to consensus building
             
             # PHASE 3: Risk Assessment & Final Recommendation
             logger.debug("⚖️ Phase 3: Final risk assessment and recommendation...")
             final_recommendation = self._generate_hedge_fund_recommendation(
-                consensus_result, data, ticker, current_price
+                consensus_result, data, ticker, current_price, regime
             )
             
+            # PHASE 4: Log prediction for accuracy tracking
+            logger.debug("📊 Phase 4: Logging prediction for accuracy measurement...")
+            market_data = {
+                'current_price': current_price,
+                'RSI': data['RSI'].iloc[-1] if 'RSI' in data.columns and len(data) > 0 else 50,
+                'ATR': data['ATR'].iloc[-1] if 'ATR' in data.columns and len(data) > 0 else current_price * 0.02,
+                'iv_rank': options_data.get('iv_data', {}).get('iv_rank', 0) if options_data else 0,
+                'ADX': data['ADX'].iloc[-1] if 'ADX' in data.columns and len(data) > 0 else 25
+            }
+            
+            prediction_id = log_prediction(
+                ticker=ticker,
+                recommendation=final_recommendation,
+                regime=regime,
+                market_data=market_data,
+                vision_enabled=hasattr(final_recommendation, 'vision_analysis'),
+                prompt_version="vA"  # Will be configurable later
+            )
+            
+            final_recommendation['prediction_id'] = prediction_id
+            final_recommendation['regime'] = regime
+            
             logger.info(f"✅ CONSENSUS REACHED: {final_recommendation['action']} {ticker} "
-                       f"(Confidence: {final_recommendation['strategy']['confidence']*100:.0f}%)")
+                       f"(Confidence: {final_recommendation['strategy']['confidence']*100:.0f}%, Regime: {regime})")
             
             return final_recommendation
             
@@ -126,7 +427,7 @@ class HedgeFundAI:
             logger.error(f"❌ Hedge Fund AI Error: {str(e)}")
             return self._generate_fallback_recommendation(data, ticker, current_price)
     
-    def _build_consensus(self, agent_views: Dict[str, Any], data: pd.DataFrame, ticker: str) -> Dict[str, Any]:
+    def _build_consensus(self, agent_views: Dict[str, Any], data: pd.DataFrame, ticker: str, regime: str = 'range') -> Dict[str, Any]:
         """
         BUILD CONSENSUS ACROSS ALL AGENTS
         
@@ -372,7 +673,7 @@ class HedgeFundAI:
             }
     
     def _generate_hedge_fund_recommendation(self, consensus: Dict[str, Any], data: pd.DataFrame, 
-                                          ticker: str, current_price: float) -> Dict[str, Any]:
+                                          ticker: str, current_price: float, regime: str = 'range') -> Dict[str, Any]:
         """
         GENERATE FINAL HEDGE FUND RECOMMENDATION
         
@@ -386,8 +687,19 @@ class HedgeFundAI:
             risk_assessment = consensus['risk_assessment']
             execution_plan = consensus['execution_plan']
             
-            # Determine final action based on consensus
-            action = self._determine_final_action(consensus, market_analysis, strategy)
+            # Perform probability fusion if vision analysis is available
+            analyst_view = consensus.get('analyst_view', {})
+            vision_analysis = consensus.get('vision_analysis', {})
+            fused_probabilities = self.fuse_agent_probabilities(analyst_view, vision_analysis, regime)
+            
+            # Store fusion results in recommendation for metrics tracking
+            recommendation_data = {
+                'fusion_analysis': fused_probabilities,
+                'regime': regime
+            }
+            
+            # Determine final action with enhanced decision logic
+            action = self._determine_final_action(consensus, market_analysis, strategy, regime, fused_probabilities)
             
             # Generate comprehensive recommendation
             recommendation = {
@@ -405,6 +717,8 @@ class HedgeFundAI:
                     'conflicts': consensus.get('conflicts', []),
                     'final_decision': consensus.get('final_decision', action)
                 },
+                'fusion_analysis': fused_probabilities,  # Add fusion results
+                'regime': regime,  # Add regime information
                 'hedge_fund_notes': self._generate_hedge_fund_notes(consensus, action, strategy)
             }
             
@@ -418,32 +732,126 @@ class HedgeFundAI:
             return self._generate_fallback_recommendation(data, ticker, current_price)
     
     def _determine_final_action(self, consensus: Dict[str, Any], market_analysis: Dict[str, Any], 
-                               strategy: Dict[str, Any]) -> str:
-        """Determine final trading action based on consensus"""
+                               strategy: Dict[str, Any], regime: str = 'range', 
+                               fused_probabilities: Dict[str, float] = None) -> str:
+        """
+        Determine final trading action using decision thresholds and no-trade zones
+        """
         try:
+            # Get fused probabilities if available
+            if fused_probabilities:
+                up_prob = fused_probabilities.get('up_probability', 0.5)
+                inside_prob = fused_probabilities.get('inside_probability', 0.5)
+            else:
+                # Fallback to basic consensus
+                up_prob = 0.6 if market_analysis.get('MACD_Signal') == 'bullish' else 0.4
+                inside_prob = 0.5
+            
             agreement_score = consensus.get('agreement_score', 0.0)
             confidence = strategy.get('confidence', 0.0)
             
-            # High confidence and agreement = GO
-            if agreement_score >= 0.8 and confidence >= 0.7:
-                return 'BUY' if market_analysis.get('MACD_Signal') == 'bullish' else 'SELL'
+            # Enhanced decision thresholds based on regime
+            regime_thresholds = {
+                'trend': {
+                    'bullish_threshold': 0.58,
+                    'bearish_threshold': 0.42,
+                    'no_trade_lower': 0.47,
+                    'no_trade_upper': 0.53,
+                    'min_confidence': 0.6
+                },
+                'range': {
+                    'bullish_threshold': 0.62,
+                    'bearish_threshold': 0.38,
+                    'no_trade_lower': 0.45,
+                    'no_trade_upper': 0.55,
+                    'min_confidence': 0.5
+                },
+                'event': {
+                    'bullish_threshold': 0.65,
+                    'bearish_threshold': 0.35,
+                    'no_trade_lower': 0.40,
+                    'no_trade_upper': 0.60,
+                    'min_confidence': 0.7
+                }
+            }
             
-            # Moderate confidence = conditional action
-            elif agreement_score >= 0.6 and confidence >= 0.5:
-                # Check additional confirmations
-                rsi = market_analysis.get('RSI', 50.0)
-                trend_strength = market_analysis.get('trend_strength', 0.0)
-                
-                if rsi < 30 and trend_strength > 25:  # Oversold with strong trend
-                    return 'BUY'
-                elif rsi > 70 and trend_strength > 25:  # Overbought with strong trend
-                    return 'SELL'
-                else:
-                    return 'HOLD'
+            thresholds = regime_thresholds.get(regime, regime_thresholds['range'])
             
-            # Low confidence = HOLD
-            else:
+            # Additional market condition filters
+            rsi = market_analysis.get('RSI', 50.0)
+            trend_strength = market_analysis.get('trend_strength', 0.0)
+            ivr = market_analysis.get('iv_rank', 0.0)
+            
+            # Check minimum agreement and confidence
+            if agreement_score < 0.5 or confidence < thresholds['min_confidence']:
+                logger.info(f"📋 NO TRADE: Insufficient consensus (agreement={agreement_score:.2f}, "
+                           f"confidence={confidence:.2f})")
                 return 'HOLD'
+            
+            # NO-TRADE ZONE: Avoid marginal probabilities
+            if thresholds['no_trade_lower'] <= up_prob <= thresholds['no_trade_upper']:
+                logger.info(f"📋 NO TRADE: Probability in no-trade zone ({up_prob:.3f})")
+                return 'HOLD'
+            
+            # BULLISH CONDITIONS with regime-specific logic
+            if up_prob >= thresholds['bullish_threshold']:
+                # Additional bullish filters
+                if regime == 'trend':
+                    # In trending markets, require trend confirmation
+                    if trend_strength > 20 and rsi > 25:  # Not deeply oversold
+                        return 'BUY'
+                elif regime == 'range':
+                    # In ranging markets, favor mean reversion setups
+                    if rsi < 65:  # Not overbought
+                        return 'BUY'
+                elif regime == 'event':
+                    # In event-driven markets, require higher conviction
+                    if confidence > 0.75 and agreement_score > 0.7:
+                        return 'BUY'
+                else:
+                    return 'BUY'
+            
+            # BEARISH CONDITIONS with regime-specific logic
+            elif up_prob <= thresholds['bearish_threshold']:
+                # Additional bearish filters
+                if regime == 'trend':
+                    # In trending markets, require trend confirmation
+                    if trend_strength > 20 and rsi < 75:  # Not deeply overbought
+                        return 'SELL'
+                elif regime == 'range':
+                    # In ranging markets, favor mean reversion setups
+                    if rsi > 35:  # Not oversold
+                        return 'SELL'
+                elif regime == 'event':
+                    # In event-driven markets, require higher conviction
+                    if confidence > 0.75 and agreement_score > 0.7:
+                        return 'SELL'
+                else:
+                    return 'SELL'
+            
+            # OPTIONS-SPECIFIC DECISIONS
+            strategy_name = strategy.get('name', '').lower()
+            if 'iron condor' in strategy_name or 'strangle' in strategy_name:
+                # Range-bound strategies need high inside probability
+                if inside_prob >= 0.62:
+                    logger.info(f"📊 RANGE STRATEGY: High inside probability ({inside_prob:.3f})")
+                    return 'BUY'  # Enter the range strategy
+            
+            # IV RANK considerations for options
+            if any(term in strategy_name for term in ['call', 'put', 'option']):
+                if ivr <= 25:
+                    # Low IV environment - prefer debit strategies
+                    if 'call' in strategy_name or 'put' in strategy_name:
+                        return 'BUY' if up_prob > 0.5 else 'SELL'
+                elif ivr >= 35:
+                    # High IV environment - prefer credit strategies  
+                    if 'credit' in strategy_name or 'covered' in strategy_name:
+                        return 'BUY' if up_prob > 0.5 else 'SELL'
+            
+            # DEFAULT: HOLD
+            logger.info(f"📋 HOLD: Conditions not met for entry "
+                       f"(up_prob={up_prob:.3f}, regime={regime})")
+            return 'HOLD'
                 
         except Exception as e:
             logger.error(f"❌ Action determination error: {str(e)}")
