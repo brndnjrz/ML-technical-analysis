@@ -14,6 +14,8 @@ from src.analysis.ai_analysis import run_ai_analysis
 from src.utils.config import DEFAULT_TICKER, DEFAULT_START_DATE, DEFAULT_END_DATE
 from src.utils.logging_config import setup_logging, set_log_level
 from src.utils.temp_manager import temp_manager, cleanup_old_temp_files
+from src.utils.metrics import get_accuracy_report
+from src.utils.vision_plotter import create_vision_optimized_chart, export_chart_for_vision
 from src.pdf_utils import generate_and_display_pdf
 
 # UI components
@@ -262,7 +264,46 @@ enable_vision_analysis = st.sidebar.checkbox(
     help="Uncheck to skip chart vision analysis and speed up processing"
 )
 
-# --- Modular Sidebar ---
+# --- Accuracy Reporting Section ---
+with st.sidebar.expander("📊 AI Accuracy Report"):
+    if st.button("📈 View Accuracy Metrics"):
+        try:
+            accuracy_report = get_accuracy_report(days_back=30)
+            
+            if 'error' not in accuracy_report:
+                st.success(f"📊 **AI Accuracy Report (Last 30 Days)**")
+                
+                # Overall metrics
+                total = accuracy_report.get('total_predictions', 0)
+                if total > 0:
+                    st.metric("Total Predictions", total)
+                    
+                    # Directional accuracy
+                    dir_acc = accuracy_report.get('directional_accuracy', {})
+                    if dir_acc.get('7d_hit_rate'):
+                        st.metric("7-Day Hit Rate", f"{dir_acc['7d_hit_rate']*100:.1f}%")
+                    
+                    # Calibration
+                    calib = accuracy_report.get('calibration', {})
+                    if calib.get('brier_score'):
+                        brier_score = calib['brier_score']
+                        st.metric("Brier Score", f"{brier_score:.3f}", 
+                                 help="Lower is better (0-1 scale)")
+                    
+                    # By regime breakdown
+                    by_regime = accuracy_report.get('by_regime', {})
+                    if by_regime:
+                        st.write("**By Market Regime:**")
+                        for regime, data in by_regime.items():
+                            regime_hit_rate = data.get('directional_accuracy', {}).get('7d_hit_rate', 0)
+                            st.write(f"• {regime.title()}: {regime_hit_rate*100:.1f}% ({data['count']} predictions)")
+                else:
+                    st.info("No predictions available for accuracy analysis")
+            else:
+                st.warning("⚠️ Accuracy report unavailable - insufficient data")
+                
+        except Exception as e:
+            st.error(f"❌ Error generating accuracy report: {e}")# --- Modular Sidebar ---
 # Stock ticker, date range, timeframee/interval, analysis type, strategy type, technical indicators
 ticker, start_date, end_date, interval, analysis_type, strategy_type, options_strategy, options_priority = sidebar_config()
 
