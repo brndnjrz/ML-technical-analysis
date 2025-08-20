@@ -10,6 +10,7 @@ import json
 import time
 import logging
 from .vision_schema import parse_vision_analysis, create_vision_prompt_template
+from ..utils.options_strategy_cheatsheet import OPTIONS_STRATEGY_CHEATSHEET
 
 # Setup logger for AI analysis
 logger = logging.getLogger(__name__)

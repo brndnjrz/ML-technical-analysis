@@ -11,6 +11,12 @@ import json
 strategies_data = [
     {
         "Strategy": "Covered Calls",
+        "Description": "Sell call options against stock you own to generate income. Best used in neutral to slightly bullish markets.",
+        "Timeframe": "Short-Term (1–7 days)",
+        "Pros": ["Generates steady income", "Reduces downside risk", "Works well in flat or slightly bullish markets"],
+        "Cons": ["Limits upside potential", "Requires owning 100 shares", "Assignment risk if stock rises sharply"],
+        "When to Use": "Use when expecting neutral to slightly bullish price action and want to generate income from owned shares.",
+        "Suitable For": "Income-focused investors with neutral to slightly bullish outlook who own shares.",
         "Timeframes": {
             "Short-Term (1–7 days)": {
                 "Key_Indicators": [
@@ -49,6 +55,12 @@ strategies_data = [
     },
     {
         "Strategy": "Cash-Secured Puts",
+        "Description": "Sell put options with enough cash to buy the stock if assigned. Used to acquire stock at a discount or generate income.",
+        "Timeframe": "Short-Term (1–7 days)",
+        "Pros": ["Acquire stock at a discount", "Earn premium income", "Defined risk (cash reserved)"],
+        "Cons": ["Requires large cash reserve", "Assignment risk in falling markets", "Limited upside if stock rallies"],
+        "When to Use": "Use when willing to buy stock at a lower price or to generate income in sideways to slightly bullish markets.",
+        "Suitable For": "Investors willing to buy stock at a discount or generate income.",
         "Timeframes": {
             "Short-Term (1–7 days)": {
                 "Key_Indicators": [
@@ -88,6 +100,12 @@ strategies_data = [
     },
     {
         "Strategy": "Iron Condors",
+        "Description": "Sell both a call spread and a put spread to profit from low volatility and range-bound price action.",
+        "Timeframe": "Short-Term (1–7 days)",
+        "Pros": ["Profits from time decay", "Defined risk", "Works best in low volatility"],
+        "Cons": ["Losses if price breaks out of range", "Requires careful strike selection", "Multiple legs increase commissions"],
+        "When to Use": "Use when expecting low volatility and range-bound price action.",
+        "Suitable For": "Traders expecting low volatility and range-bound price action.",
         "Timeframes": {
             "Short-Term (1–7 days)": {
                 "Key_Indicators": [
@@ -127,6 +145,12 @@ strategies_data = [
     },
     {
         "Strategy": "Credit Spreads",
+        "Description": "Sell one option and buy another further out-of-the-money to limit risk. Used for directional trades with defined risk.",
+        "Timeframe": "Short-Term (1–7 days)",
+        "Pros": ["Defined risk and reward", "Profits from time decay", "Flexible for bullish or bearish setups"],
+        "Cons": ["Limited profit potential", "Losses if price moves against position", "Requires margin approval"],
+        "When to Use": "Use for defined-risk directional trades in moderately trending markets.",
+        "Suitable For": "Directional traders seeking defined risk and reward.",
         "Timeframes": {
             "Short-Term (1–7 days)": {
                 "Key_Indicators": [
@@ -168,6 +192,12 @@ strategies_data = [
     },
     {
         "Strategy": "Swing Trading",
+        "Description": "Hold positions for several days to weeks to capture short- to medium-term price moves.",
+        "Timeframe": "Short-Term (1–7 days)",
+        "Pros": ["Captures larger moves than day trading", "Less time required than long-term investing", "Can use options for leverage"],
+        "Cons": ["Subject to overnight risk", "Requires monitoring for reversals", "May miss long-term trends"],
+        "When to Use": "Use to capture short- to medium-term price swings, especially after a pullback or breakout.",
+        "Suitable For": "Traders aiming to capture short- to medium-term price swings.",
         "Timeframes": {
             "Short-Term (1–7 days)": {
                 "Key_Indicators": [
@@ -209,6 +239,12 @@ strategies_data = [
     },
     {
         "Strategy": "Day Trading Calls/Puts",
+        "Description": "Buy calls or puts for intraday moves, closing positions before the end of the trading day to avoid overnight risk.",
+        "Timeframe": "Intraday (minutes to hours)",
+        "Pros": ["No overnight risk", "Quick profit/loss realization", "High number of trading opportunities"],
+        "Cons": ["Requires constant attention", "High commissions/fees", "Can be stressful and risky"],
+        "When to Use": "Use for intraday moves when you want to avoid overnight risk and capitalize on quick price swings.",
+        "Suitable For": "Active traders seeking intraday opportunities and quick profits.",
         "Timeframes": {
             "Intraday (minutes to hours)": {
                 "Key_Indicators": [

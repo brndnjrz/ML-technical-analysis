@@ -3,6 +3,7 @@ import pandas as pd
 import os
 import logging 
 import re
+from src.analysis.indicators import determine_trend
 
 # Core functionality imports
 from src import plotter
@@ -619,7 +620,6 @@ if "stock_data" in st.session_state:
                 st.info("Please ensure the options analyzer component is properly installed.")
         else:
             st.info("Select 'Options Trading Strategy' in the sidebar to use the Options Analyzer.")
-            
             # Show a quick options trading overview
             st.subheader("Options Trading Overview")
             st.markdown("""
@@ -718,50 +718,83 @@ if "stock_data" in st.session_state:
             6. **TREND ANALYSIS**: Primary and secondary trends
             """
     elif analysis_type == "Options Trading Strategy":
-        if "Short-Term" in strategy_type:
-            prompt = f"""
-            You are an expert short-term options trader. Analyze this {interval} chart for {ticker}.
+        from src.analysis.options_analysis import analyze_options_chain, get_options_cheatsheet_markdown
+        from src.utils.options_strategy_cheatsheet import OPTIONS_STRATEGY_CHEATSHEET
+        
+        st.subheader("Options Strategy Analyzer")
+        col1, col2 = st.columns([2, 1])
+        
+        with col1:
+            # Extract short-term and medium-term trends
+
+            short_term_trend = determine_trend(data.tail(20))
+            medium_term_trend = determine_trend(data.tail(50))
+            # Use IV Rank from options_data if available, else fallback to 50
+            iv_rank = options_data.get('iv_data', {}).get('iv_rank', 50) if options_data else 50
+            current_price = data['Close'].iloc[-1]
+            # Run professional options analysis using our cheatsheet
+            options_analysis = analyze_options_chain(
+                data,
+                ticker,
+                current_price,
+                short_term_trend,
+                medium_term_trend,
+                iv_rank
+            )
             
-            {market_context}
+            # Display options analysis
+            st.markdown("### 🔄 Market Context")
+            st.markdown(f"- Short-term trend: **{short_term_trend.title()}**")
+            st.markdown(f"- Medium-term trend: **{medium_term_trend.title()}**")
+            st.markdown(f"- IV Rank: **{iv_rank:.1f}%**")
+
+            if 'market_conditions' in options_analysis:
+                st.markdown(f"- Market Regime: **{options_analysis['market_conditions']['market_regime']}**")
+            else:
+                st.warning("Options analysis failed or returned incomplete data. Please check your input or try again.")
+                st.code(f"options_analysis keys: {list(options_analysis.keys())}\nFull object: {options_analysis}", language='python')
             
-            FOCUS ON SHORT-TERM INDICATORS (1-7 days):
-            - Fast RSI signals (overbought >70, oversold <30)
-            - MACD crossovers and histogram changes
-            - Stochastic momentum shifts
-            - ATR for volatility-based strike selection
-            - VWAP as intraday support/resistance
-            - Volume spikes and unusual activity
+            # Display strategy recommendation
+
+            st.markdown("### 🎯 Strategy Recommendation")
+            strategy = options_analysis.get('strategy_recommendation', {})
+            expected_keys = ['name', 'trend_direction', 'volatility_environment', 'price_pattern', 'rationale', 'Description']
+            missing_keys = [k for k in expected_keys if k not in strategy]
+            if missing_keys:
+                st.warning(f"Strategy recommendation is missing keys: {missing_keys}.\nAvailable keys: {list(strategy.keys()) if strategy else 'None'}\nFull object: {strategy}")
+            st.markdown(f"**{strategy.get('name', 'N/A')}**")
+            st.markdown(f"- **Direction:** {strategy.get('trend_direction', 'N/A').title() if strategy.get('trend_direction') else 'N/A'}")
+            st.markdown(f"- **Volatility:** {strategy.get('volatility_environment', 'N/A').title() if strategy.get('volatility_environment') else 'N/A'}")
+            st.markdown(f"- **Pattern:** {strategy.get('price_pattern', 'N/A').title() if strategy.get('price_pattern') else 'N/A'}")
+            st.markdown(f"- **Rationale:** {strategy.get('rationale', 'N/A')}")
+            if 'Description' in strategy:
+                st.markdown(f"- **Description:** {strategy['Description']}")
+            # Display risk management
+            st.markdown("### ⚠️ Risk Management")
+            risk_management = options_analysis.get('risk_management', {})
+            rules = risk_management.get('rules', [])
+            if not rules:
+                st.warning(f"No risk management guidance available for this analysis.\nAvailable keys: {list(risk_management.keys()) if risk_management else 'None'}\nFull object: {risk_management}")
+            else:
+                for rule in rules:
+                    st.markdown(f"- {rule}")
+                st.markdown(f"- Recommended stop: **{risk_management.get('recommended_stop', 'N/A')}**")
             
-            PROVIDE:
-            1. **TRADE RECOMMENDATION**: [YES/NO]
-            2. **STRATEGY**: Specific options strategy ({options_strategy})
-            3. **STRIKES & EXPIRATION**: Based on ATR and support/resistance
-            4. **ENTRY/EXIT CRITERIA**: Specific indicator levels
-            5. **RISK MANAGEMENT**: Stop loss and profit targets
-            6. **RATIONALE**: Why this setup works for short-term options
-            """
-        else:  # Long-term
-            prompt = f"""
-            You are an expert swing trader specializing in long-term options strategies. 
+        with col2:
+            st.markdown("### 📊 Professional Options Framework")
+            st.markdown("Our AI uses this 5-step analyst process:")
             
-            {market_context}
+            for step, description in zip(
+                options_analysis['analysis_process'].keys(),
+                options_analysis['analysis_process'].values()
+            ):
+                st.markdown(f"**{step.upper()}:** {description}")
             
-            FOCUS ON TREND INDICATORS (1-3 weeks):
-            - RSI divergences and trend strength
-            - ADX for trend confirmation (>25 = strong trend)
-            - Moving average alignment (50/200 EMA)
-            - MACD trend changes and histogram
-            - Volume trends and accumulation/distribution
-            - Major support/resistance levels
+            st.markdown("---")
             
-            PROVIDE:
-            1. **TRADE RECOMMENDATION**: [YES/NO]
-            2. **STRATEGY**: Specific options strategy ({options_strategy})
-            3. **STRIKES & EXPIRATION**: 2-3 weeks out, based on major levels
-            4. **TREND ANALYSIS**: Primary trend direction and strength
-            5. **RISK/REWARD**: Expected profit targets and stop losses
-            6. **RATIONALE**: Why this setup works for swing trading
-            """
+            # Add option to view the full cheatsheet
+            if st.button("📘 View Full Options Strategy Cheatsheet"):
+                st.markdown(get_options_cheatsheet_markdown())
 
     # Run AI analysis synchronously (for simplicity)
 
@@ -769,16 +802,20 @@ if "stock_data" in st.session_state:
         # Create progress indicators
         progress_bar = st.progress(0)
         status_text = st.empty()
-        
+
+        # Ensure prompt is always defined
+        if 'prompt' not in locals() or prompt is None:
+            prompt = "PROVIDE:"
+
         with st.spinner("🤖 AI is analyzing the market..."):
             print("\n" + "="*60)
             print("🤖 STARTING AI MARKET ANALYSIS")
             print("="*60)
-            
+
             # Step 1: Price Prediction (20%)
             status_text.text("🔮 Generating price predictions...")
             progress_bar.progress(20)
-            
+
             # Get the price prediction using ensemble of models
             try:
                 prediction_result = predict_next_day_close(
@@ -786,7 +823,7 @@ if "stock_data" in st.session_state:
                     fundamentals,
                     st.session_state["active_indicators"]
                 )
-                
+
                 if prediction_result and isinstance(prediction_result, tuple) and prediction_result[0] is not None:
                     predicted_price, confidence = prediction_result
                     # Create a new column filled with the predicted price
@@ -797,8 +834,7 @@ if "stock_data" in st.session_state:
                     market_context += f"\nNEXT DAY PREDICTED CLOSE: ${predicted_price:.2f} (Change: ${price_change:.2f}, Confidence: {confidence:.1%})\n"
 
                     # Update the prompt with prediction info
-                    prediction_context = f"""PREDICTED NEXT DAY CLOSE: ${predicted_price:.2f} (Confidence: {confidence:.1%})
-PRICE CHANGE: ${price_change:.2f} ({(price_change/data['Close'].iloc[-1]*100):.1f}%)"""
+                    prediction_context = f"""PREDICTED NEXT DAY CLOSE: ${predicted_price:.2f} (Confidence: {confidence:.1%})\nPRICE CHANGE: ${price_change:.2f} ({(price_change/data['Close'].iloc[-1]*100):.1f}%)"""
                     print(f"✅ Price prediction: ${predicted_price:.2f} (Confidence: {confidence:.1%})")
                 else:
                     print("⚠️ AI price prediction temporarily unavailable (insufficient data)")
@@ -820,13 +856,13 @@ PRICE CHANGE: ${price_change:.2f} ({(price_change/data['Close'].iloc[-1]*100):.1
 
             # Create temporary chart file using temp manager
             chart_path = temp_manager.create_chart_file(ticker)
-            
+
             # Save chart to temporary file (suppress verbose logging)
             import logging as base_logging
             kaleido_logger = base_logging.getLogger('kaleido')
             original_level = kaleido_logger.level
             kaleido_logger.setLevel(base_logging.WARNING)
-            
+
             try:
                 subplot_fig.write_image(chart_path)
                 print(f"✅ Chart prepared for AI analysis")
@@ -835,11 +871,11 @@ PRICE CHANGE: ${price_change:.2f} ({(price_change/data['Close'].iloc[-1]*100):.1
                 st.error(f"Failed to save chart: {e}")
             finally:
                 kaleido_logger.setLevel(original_level)
-            
+
             # Step 3: Run AI Analysis (60%)
             status_text.text("🧠 Running AI analysis...")
             progress_bar.progress(60)
-            
+
             # Run AI analysis with user-configured settings
             try:
                 # Use user-defined timeout, with strategy-based adjustment
@@ -847,13 +883,13 @@ PRICE CHANGE: ${price_change:.2f} ({(price_change/data['Close'].iloc[-1]*100):.1
                     adjusted_timeout = max(vision_timeout - 30, 30)  # Reduce for short-term
                 else:
                     adjusted_timeout = vision_timeout
-                
+
                 if enable_vision_analysis:
                     status_text.text(f"🧠 Running AI analysis (Vision timeout: {adjusted_timeout}s)...")
                 else:
                     status_text.text("🧠 Running AI analysis (Vision analysis disabled)...")
                     adjusted_timeout = 0  # Skip vision analysis
-                
+
                 analysis, recommendation = run_ai_analysis(
                     daily_fig=daily_fig,
                     timeframe_fig=timeframe_fig,
@@ -863,14 +899,14 @@ PRICE CHANGE: ${price_change:.2f} ({(price_change/data['Close'].iloc[-1]*100):.1
                     vision_timeout=adjusted_timeout,
                     options_priority=options_priority
                 )
-                
+
                 # Step 4: Complete Analysis (100%)
                 status_text.text("✅ Analysis complete!")
                 progress_bar.progress(100)
-                
+
                 print("✅ AI MARKET ANALYSIS COMPLETED")
                 print("="*60 + "\n")
-                
+
                 st.session_state["ai_analysis_result"] = (analysis, chart_path, recommendation)
                 # Reset the run_analysis flag to prevent re-running on page refresh
                 st.session_state['run_analysis'] = False

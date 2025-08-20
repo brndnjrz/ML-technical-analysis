@@ -1,4 +1,10 @@
-# Updated AI Trading System Flowchart - With Accuracy Optimization
+# Updated AI Trading System Flowchart - With Accuracy Optimization & Robust Error Handling
+
+> **Update:**
+> - All strategy outputs now include every required key (Description, Timeframe, Pros, Cons, When to Use, Suitable For, final_recommendation).
+> - Robust error handling and fallback logic: UI and agents always display a default or fallback value if any key is missing.
+> - Multi-agent consensus and fallback logic ensure the app never crashes due to missing data.
+> - Professional reporting and PDF generation are now resilient to incomplete data.
 
 ```mermaid
 flowchart TD
