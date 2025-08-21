@@ -385,7 +385,6 @@ if "stock_data" in st.session_state:
         try:
             from src.analysis.options_analysis import analyze_options_chain
             short_term_trend = determine_trend(data.tail(20))
-            medium_term_trend = determine_trend(data.tail(50))
             iv_rank = options_data.get('iv_data', {}).get('iv_rank', 50) if options_data else 50
             current_price = data['Close'].iloc[-1]
             options_analysis = analyze_options_chain(
@@ -393,7 +392,6 @@ if "stock_data" in st.session_state:
                 ticker,
                 current_price,
                 short_term_trend,
-                medium_term_trend,
                 iv_rank
             )
             # Build context string from options_analysis
@@ -746,11 +744,8 @@ OPTIONS STRATEGY ANALYZER OUTPUT:
         col1, col2 = st.columns([2, 1])
         
         with col1:
-            # Extract short-term and medium-term trends
-
+            # Extract short-term trend only
             short_term_trend = determine_trend(data.tail(20))
-            medium_term_trend = determine_trend(data.tail(50))
-            # Use IV Rank from options_data if available, else fallback to 50
             iv_rank = options_data.get('iv_data', {}).get('iv_rank', 50) if options_data else 50
             current_price = data['Close'].iloc[-1]
             # Run professional options analysis using our cheatsheet
@@ -759,14 +754,12 @@ OPTIONS STRATEGY ANALYZER OUTPUT:
                 ticker,
                 current_price,
                 short_term_trend,
-                medium_term_trend,
                 iv_rank
             )
             
             # Display options analysis
             st.markdown("### 🔄 Market Context")
             st.markdown(f"- Short-term trend: **{short_term_trend.title()}**")
-            st.markdown(f"- Medium-term trend: **{medium_term_trend.title()}**")
             st.markdown(f"- IV Rank: **{iv_rank:.1f}%**")
 
             if 'market_conditions' in options_analysis:

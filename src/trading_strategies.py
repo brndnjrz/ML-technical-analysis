@@ -192,12 +192,9 @@ strategies_data = [
     },
     {
         "Strategy": "Swing Trading",
-        "Description": "Hold positions for several days to weeks to capture short- to medium-term price moves.",
         "Timeframe": "Short-Term (1–7 days)",
         "Pros": ["Captures larger moves than day trading", "Less time required than long-term investing", "Can use options for leverage"],
         "Cons": ["Subject to overnight risk", "Requires monitoring for reversals", "May miss long-term trends"],
-        "When to Use": "Use to capture short- to medium-term price swings, especially after a pullback or breakout.",
-        "Suitable For": "Traders aiming to capture short- to medium-term price swings.",
         "Timeframes": {
             "Short-Term (1–7 days)": {
                 "Key_Indicators": [
@@ -331,7 +328,6 @@ def get_strategy_by_timeframe(timeframe):
             if any('Short-Term' in tf or 'Intraday' in tf for tf in timeframes.keys()):
                 matching_strategies.append(strategy)
         elif timeframe == 'medium_term':
-            # Look for medium-term timeframes
             if any('Medium' in tf or 'Long-Term' in tf for tf in timeframes.keys()):
                 matching_strategies.append(strategy)
         else:  # long_term

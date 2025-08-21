@@ -16,7 +16,6 @@ def analyze_options_chain(
     ticker: str, 
     current_price: float, 
     short_term_trend: str, 
-    medium_term_trend: str,
     iv_rank: float
 ) -> Dict[str, Any]:
     """
@@ -27,9 +26,7 @@ def analyze_options_chain(
         ticker: Stock symbol
         current_price: Current price of the stock
         short_term_trend: Detected short-term trend ('uptrend', 'downtrend', 'sideways')
-        medium_term_trend: Detected medium-term trend ('uptrend', 'downtrend', 'sideways')
         iv_rank: Implied Volatility Rank (0-100)
-        
     Returns:
         Dictionary with options analysis results and recommendations
     """
@@ -58,18 +55,12 @@ def analyze_options_chain(
         # Get ADX if available
         adx_value = recent_data['adx'].iloc[-1] if 'adx' in recent_data.columns else 15
         
-        # Determine market regime based on short and medium term trends
-        if short_term_trend == "uptrend" and medium_term_trend == "uptrend":
-            market_regime = "Strong Bullish"
+        # Determine market regime based only on short term trend
+        if short_term_trend == "uptrend":
+            market_regime = "Bullish"
             trend = "bullish"
-        elif short_term_trend == "uptrend" and medium_term_trend != "uptrend":
-            market_regime = "Weak Bullish"
-            trend = "bullish"
-        elif short_term_trend == "downtrend" and medium_term_trend == "downtrend":
-            market_regime = "Strong Bearish"
-            trend = "bearish"
-        elif short_term_trend == "downtrend" and medium_term_trend != "downtrend":
-            market_regime = "Weak Bearish"
+        elif short_term_trend == "downtrend":
+            market_regime = "Bearish"
             trend = "bearish"
         else:
             market_regime = "Neutral"
@@ -122,7 +113,6 @@ def analyze_options_chain(
             "current_price": current_price,
             "market_conditions": {
                 "short_term_trend": short_term_trend,
-                "medium_term_trend": medium_term_trend,
                 "market_regime": market_regime,
                 "iv_rank": iv_rank,
                 "rsi": rsi_value,

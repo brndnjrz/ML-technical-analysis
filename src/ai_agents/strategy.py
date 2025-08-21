@@ -198,7 +198,7 @@ class StrategyAgent:
                         'type': trend,
                         'description': f"Options strategy for {trend} market with {'high' if iv_high else 'low'} implied volatility",
                         'rationale': strategy_matrix['rationale'],
-                        'timeframe': 'short-term' if 'momentum' in conditions and conditions['momentum'] == 'strong' else 'medium-term',
+                        'timeframe': 'short-term',
                         'options_strategy': True
                     })
                     
@@ -337,11 +337,11 @@ class StrategyAgent:
             # Base parameters from strategy timeframe
             timeframe_info = strategy_data.get('Timeframe Used With', '')
             if 'days' in timeframe_info.lower() or 'weeks' in timeframe_info.lower():
-                parameters['holding_period'] = 'medium_term'
+                parameters['holding_period'] = 'short_term'
             elif 'minutes' in timeframe_info.lower() or 'hours' in timeframe_info.lower():
                 parameters['holding_period'] = 'short_term'
             else:
-                parameters['holding_period'] = 'flexible'
+                parameters['holding_period'] = 'short_term'
             # Get price data from conditions instead of self.data
             price_data = conditions.get('price_data', {})
             current_price = price_data.get('current_price')

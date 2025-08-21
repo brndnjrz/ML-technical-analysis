@@ -72,22 +72,15 @@ class AnalystAgent:
         try:
             # Short-term trend (20-day MA)
             short_term = data['EMA_20'].iloc[-1] > data['EMA_20'].iloc[-2]
-            
-            # Medium-term trend (50-day MA)
-            medium_term = data['EMA_50'].iloc[-1] > data['EMA_50'].iloc[-2]
-            
             # Trend strength (ADX)
             trend_strength = data['ADX'].iloc[-1]
-            
             trend_analysis = {
                 'short_term': 'bullish' if short_term else 'bearish',
-                'medium_term': 'bullish' if medium_term else 'bearish',
                 'strength': trend_strength,
                 'strength_level': 'strong' if trend_strength > 25 else 'weak'
             }
         except Exception as e:
             print(f"Error in trend analysis: {str(e)}")
-            
         return trend_analysis
     
     def _analyze_momentum(self, data: pd.DataFrame) -> Dict[str, Any]:
@@ -238,7 +231,7 @@ class AnalystAgent:
                         'strategy_relevance': ['Swing Trading', 'Covered Calls', 'Day Trading Calls/Puts'],
                         'description': 'Price above both EMAs with bullish alignment',
                         'confidence': 0.8,
-                        'time_horizon': 'medium_term'
+                        'time_horizon': 'short_term'
                     })
                 elif current_price < ema_20 < ema_50:  # Bearish alignment
                     patterns.append({
@@ -246,7 +239,7 @@ class AnalystAgent:
                         'strategy_relevance': ['Swing Trading', 'Protective Puts', 'Day Trading Calls/Puts'],
                         'description': 'Price below both EMAs with bearish alignment',
                         'confidence': 0.8,
-                        'time_horizon': 'medium_term'
+                        'time_horizon': 'short_term'
                     })
         except Exception as e:
             print(f"Error finding trend patterns: {str(e)}")
@@ -269,7 +262,7 @@ class AnalystAgent:
                         'strategy_relevance': ['Iron Condors', 'Credit Spreads', 'Covered Calls'],
                         'description': 'Price consolidating in tight range',
                         'confidence': 0.75,
-                        'time_horizon': 'short_to_medium_term'
+                        'time_horizon': 'short_term'
                     })
         except Exception as e:
             print(f"Error finding range patterns: {str(e)}")
