@@ -376,9 +376,53 @@ if "stock_data" in st.session_state:
         
     options_data = st.session_state.get("options_data", {})
     ticker_str = ticker.upper()
-    
-    # Create tabs for different types of analysis
-    tab1, tab2, tab3 = st.tabs(["📈 Technical Analysis", "🤖 AI Recommendation", "💰 Options Analyzer"])
+
+    # --- Options Strategy Analyzer Integration ---
+    options_strategy_context = ""
+    # Explicit variables for AI model (optional, for structured input)
+    options_ai_vars = {}
+    if analysis_type == "Options Trading Strategy":
+        try:
+            from src.analysis.options_analysis import analyze_options_chain
+            short_term_trend = determine_trend(data.tail(20))
+            medium_term_trend = determine_trend(data.tail(50))
+            iv_rank = options_data.get('iv_data', {}).get('iv_rank', 50) if options_data else 50
+            current_price = data['Close'].iloc[-1]
+            options_analysis = analyze_options_chain(
+                data,
+                ticker,
+                current_price,
+                short_term_trend,
+                medium_term_trend,
+                iv_rank
+            )
+            # Build context string from options_analysis
+            strategy = options_analysis.get('strategy_recommendation', {})
+            risk_management = options_analysis.get('risk_management', {})
+            options_strategy_context = f"""
+OPTIONS STRATEGY ANALYZER OUTPUT:
+- Market Regime: {options_analysis.get('market_conditions', {}).get('market_regime', 'N/A')}
+- Recommended Strategy: {strategy.get('name', 'N/A')}
+- Direction: {strategy.get('trend_direction', 'N/A')}
+- Volatility: {strategy.get('volatility_environment', 'N/A')}
+- Pattern: {strategy.get('price_pattern', 'N/A')}
+- Rationale: {strategy.get('rationale', 'N/A')}
+- Description: {strategy.get('Description', 'N/A')}
+- Risk Management: {risk_management.get('rules', [])}
+- Recommended Stop: {risk_management.get('recommended_stop', 'N/A')}
+"""
+            # Optional: pass explicit variables for AI model (if backend supports)
+            options_ai_vars = {
+                "options_recommended_stop": risk_management.get('recommended_stop', None),
+                "options_direction": strategy.get('trend_direction', None),
+                "options_rationale": strategy.get('rationale', None)
+            }
+        except Exception as e:
+            options_strategy_context = f"OPTIONS STRATEGY ANALYZER OUTPUT: Unavailable due to error: {e}"
+            options_ai_vars = {}
+
+    # Create tabs for different types of analysis (Options Analyzer tab removed)
+    tab1, tab2 = st.tabs(["📈 Technical Analysis", "🤖 AI Recommendation"])
     
     # --- TAB 1: TECHNICAL ANALYSIS ---
     with tab1:
@@ -607,31 +651,28 @@ if "stock_data" in st.session_state:
                     st.session_state['run_analysis'] = True
             
     # --- TAB 3: OPTIONS ANALYZER ---
-    with tab3:
-        if analysis_type == "Options Trading Strategy":
-            try:
-                # Import and use our options analyzer component
-                from src.ui_components.options_analyzer import display_options_analyzer
-                
-                # Display options analyzer component
-                display_options_analyzer(ticker_str, data, options_data.get(ticker_str, {}))
-            except ImportError as e:
-                st.error(f"Error loading Options Analyzer: {str(e)}")
-                st.info("Please ensure the options analyzer component is properly installed.")
-        else:
-            st.info("Select 'Options Trading Strategy' in the sidebar to use the Options Analyzer.")
-            # Show a quick options trading overview
-            st.subheader("Options Trading Overview")
-            st.markdown("""
-            Options trading provides flexible strategies for various market conditions:
-            
-            - **Bullish strategies**: Long calls, bull call spreads, bull put spreads
-            - **Bearish strategies**: Long puts, bear put spreads, bear call spreads
-            - **Neutral strategies**: Iron condors, butterflies, calendar spreads
-            - **Volatility strategies**: Straddles, strangles
-            
-            Switch to 'Options Trading Strategy' in the sidebar to access the full Options Analyzer.
-            """)
+    # The following block is removed because the Options Analyzer tab is not used.
+    # with tab3:
+    #     if analysis_type == "Options Trading Strategy":
+    #         try:
+    #             from src.ui_components.options_analyzer import display_options_analyzer
+    #             display_options_analyzer(ticker_str, data, options_data.get(ticker_str, {}))
+    #         except ImportError as e:
+    #             st.error(f"Error loading Options Analyzer: {str(e)}")
+    #             st.info("Please ensure the options analyzer component is properly installed.")
+    #     else:
+    #         st.info("Select 'Options Trading Strategy' in the sidebar to use the Options Analyzer.")
+    #         st.subheader("Options Trading Overview")
+    #         st.markdown("""
+    #         Options trading provides flexible strategies for various market conditions:
+    #         
+    #         - **Bullish strategies**: Long calls, bull call spreads, bull put spreads
+    #         - **Bearish strategies**: Long puts, bear put spreads, bear call spreads
+    #         - **Neutral strategies**: Iron condors, butterflies, calendar spreads
+    #         - **Volatility strategies**: Straddles, strangles
+    #         
+    #         Switch to 'Options Trading Strategy' in the sidebar to access the full Options Analyzer.
+    #         """)
 
     # Build enhanced prompt with strategy-specific focus
     market_context = f"""
@@ -644,33 +685,9 @@ if "stock_data" in st.session_state:
     - Active Indicators: {', '.join(st.session_state["active_indicators"])}
     """
 
-    # Add strategy context
-    if options_strategy:
-        selected_strategy_info = get_strategy_by_name(options_strategy)
-        if selected_strategy_info:
-            # Get first available timeframe for strategy context
-            timeframes = selected_strategy_info.get('Timeframes', {})
-            first_timeframe = list(timeframes.keys())[0] if timeframes else None
-            
-            if first_timeframe:
-                timeframe_data = timeframes[first_timeframe]
-                strategy_context = f"""
-                SELECTED STRATEGY CONTEXT:
-                - Strategy: {selected_strategy_info['Strategy']}
-                - Timeframe: {first_timeframe}
-                - Best Use: {timeframe_data.get('Best_Use', 'N/A')}
-                - Key Indicators: {', '.join(timeframe_data.get('Key_Indicators', [])[:3])}
-                - Advanced Tips: {', '.join(timeframe_data.get('Advanced_Tips', [])[:2])}
-                """
-                market_context += "\n" + strategy_context
-
-    if options_data:
-        market_context += f"""
-        OPTIONS MARKET DATA:
-        - IV Rank: {options_data.get('iv_data', {}).get('iv_rank', 'N/A')}%
-        - IV Percentile: {options_data.get('iv_data', {}).get('iv_percentile', 'N/A')}%
-        - 30-Day Historical Volatility: {options_data.get('iv_data', {}).get('hv_30', 'N/A')}%
-        """
+    # Add options strategy context to the prompt if available
+    if options_strategy_context:
+        market_context += "\n" + options_strategy_context
 
     # Strategy-specific prompts
     if analysis_type == "Stock Buy/Hold/Sell":
@@ -687,7 +704,9 @@ if "stock_data" in st.session_state:
             - Short-term moving averages
             - Price action and candlestick patterns
             - Support/resistance levels
-            
+
+            INCORPORATE THE OPTIONS STRATEGY RECOMMENDATION AND RISK MANAGEMENT ABOVE INTO YOUR TRADING PLAN.
+
             PROVIDE:
             1. **RECOMMENDATION**: [BUY/SELL/HOLD]
             2. **ENTRY POINTS**: Specific price levels
@@ -708,7 +727,9 @@ if "stock_data" in st.session_state:
             - Volume trends and accumulation
             - Long-term support/resistance
             - Market sentiment indicators
-            
+
+            INCORPORATE THE OPTIONS STRATEGY RECOMMENDATION AND RISK MANAGEMENT ABOVE INTO YOUR TRADING PLAN.
+
             PROVIDE:
             1. **RECOMMENDATION**: [BUY/SELL/HOLD]
             2. **TIMEFRAME**: Expected holding period
