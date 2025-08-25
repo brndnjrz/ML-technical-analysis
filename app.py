@@ -9,6 +9,8 @@ from src import plotter
 from src.core.data_pipeline import fetch_and_process_data
 from src.analysis.prediction import get_fundamental_metrics, predict_next_day_close
 from src.analysis.ai_analysis import run_ai_analysis
+from src.ai_agents.strategy_arbiter import choose_final_strategy
+from src.utils.ai_output_schema import validate_ai_model_output
 from src.utils.config import DEFAULT_TICKER, DEFAULT_START_DATE, DEFAULT_END_DATE
 from src.utils.logging_config import setup_logging, set_log_level
 from src.utils.temp_manager import temp_manager, cleanup_old_temp_files
@@ -365,8 +367,10 @@ if "stock_data" in st.session_state:
 
     # --- Options Strategy Analyzer Integration ---
     options_strategy_context = ""
-    # Explicit variables for AI model (optional, for structured input)
     options_ai_vars = {}
+    candidate_strategies = []
+    features = {}
+    user_timeframe = "intraday" if "intraday" in strategy_type.lower() or interval in ["1m", "5m", "15m"] else "1-7d" if "short" in strategy_type.lower() else "2-4w"
     if analysis_type == "Options Trading Strategy":
         try:
             from src.analysis.options_analysis import analyze_options_chain
@@ -395,11 +399,28 @@ OPTIONS STRATEGY ANALYZER OUTPUT:
 - Risk Management: {risk_management.get('rules', [])}
 - Recommended Stop: {risk_management.get('recommended_stop', 'N/A')}
 """
-            # Optional: pass explicit variables for AI model (if backend supports)
             options_ai_vars = {
                 "options_recommended_stop": risk_management.get('recommended_stop', None),
                 "options_direction": strategy.get('trend_direction', None),
                 "options_rationale": strategy.get('rationale', None)
+            }
+            # Collect candidate strategy for arbiter
+            candidate_strategies.append({
+                "name": strategy.get('name'),
+                "timeframe": user_timeframe,
+                "trend": strategy.get('trend_direction'),
+                "type": strategy.get('name', '').lower().replace(' ', '_'),
+                "iv_rank": iv_rank,
+                "adx": options_analysis.get('market_conditions', {}).get('adx', 0),
+                "rsi": options_analysis.get('market_conditions', {}).get('rsi', 50),
+                "confidence": 0.7,  # Placeholder, can be improved
+                "rationale": strategy.get('rationale', '')
+            })
+            features = {
+                "trend": strategy.get('trend_direction'),
+                "adx": options_analysis.get('market_conditions', {}).get('adx', 0),
+                "rsi": options_analysis.get('market_conditions', {}).get('rsi', 50),
+                "iv_rank": iv_rank
             }
         except Exception as e:
             options_strategy_context = f"OPTIONS STRATEGY ANALYZER OUTPUT: Unavailable due to error: {e}"
@@ -796,43 +817,30 @@ OPTIONS STRATEGY ANALYZER OUTPUT:
                 st.markdown(get_options_cheatsheet_markdown())
 
     # Run AI analysis synchronously (for simplicity)
-
     if st.session_state.get('run_analysis', False):
-        # Create progress indicators
         progress_bar = st.progress(0)
         status_text = st.empty()
-
-        # Ensure prompt is always defined
         if 'prompt' not in locals() or prompt is None:
             prompt = "PROVIDE:"
-
         with st.spinner("🤖 AI is analyzing the market..."):
             print("\n" + "="*60)
             print("🤖 STARTING AI MARKET ANALYSIS")
             print("="*60)
-
             # Step 1: Price Prediction (20%)
             status_text.text("🔮 Generating price predictions...")
             progress_bar.progress(20)
-
-            # Get the price prediction using ensemble of models
             try:
                 prediction_result = predict_next_day_close(
                     data.copy(),
                     fundamentals,
                     st.session_state["active_indicators"]
                 )
-
                 if prediction_result and isinstance(prediction_result, tuple) and prediction_result[0] is not None:
                     predicted_price, confidence = prediction_result
-                    # Create a new column filled with the predicted price
                     data['Predicted_Close'] = float(predicted_price)
                     price_change = predicted_price - data['Close'].iloc[-1]
                     data['Predicted_Price_Change'] = price_change
-                    # Update market context with predicted price and confidence
                     market_context += f"\nNEXT DAY PREDICTED CLOSE: ${predicted_price:.2f} (Change: ${price_change:.2f}, Confidence: {confidence:.1%})\n"
-
-                    # Update the prompt with prediction info
                     prediction_context = f"""PREDICTED NEXT DAY CLOSE: ${predicted_price:.2f} (Confidence: {confidence:.1%})\nPRICE CHANGE: ${price_change:.2f} ({(price_change/data['Close'].iloc[-1]*100):.1f}%)"""
                     print(f"✅ Price prediction: ${predicted_price:.2f} (Confidence: {confidence:.1%})")
                 else:
@@ -843,25 +851,18 @@ OPTIONS STRATEGY ANALYZER OUTPUT:
             except Exception as e:
                 print(f"⚠️ Prediction error: {str(e)}")
                 prediction_context = "AI PRICE PREDICTION: Temporarily unavailable"
-
             # Step 2: Prepare Chart (40%)
             status_text.text("📊 Preparing chart analysis...")
             progress_bar.progress(40)
-
             if "Short-Term" in strategy_type:
                 prompt = prompt.replace("PROVIDE:", f"{prediction_context}\nCONSIDER HOW THIS PRICE AFFECTS SHORT-TERM INDICATORS AND MOMENTUM.\n\nPROVIDE:")
             else:
                 prompt = prompt.replace("PROVIDE:", f"{prediction_context}\nCONSIDER HOW THIS PRICE AFFECTS TRENDS AND LONG-TERM STRATEGIES.\n\nPROVIDE:")
-
-            # Create temporary chart file using temp manager
             chart_path = temp_manager.create_chart_file(ticker)
-
-            # Save chart to temporary file (suppress verbose logging)
             import logging as base_logging
             kaleido_logger = base_logging.getLogger('kaleido')
             original_level = kaleido_logger.level
             kaleido_logger.setLevel(base_logging.WARNING)
-
             try:
                 subplot_fig.write_image(chart_path)
                 print(f"✅ Chart prepared for AI analysis")
@@ -870,25 +871,20 @@ OPTIONS STRATEGY ANALYZER OUTPUT:
                 st.error(f"Failed to save chart: {e}")
             finally:
                 kaleido_logger.setLevel(original_level)
-
             # Step 3: Run AI Analysis (60%)
             status_text.text("🧠 Running AI analysis...")
             progress_bar.progress(60)
-
-            # Run AI analysis with user-configured settings
             try:
-                # Use user-defined timeout, with strategy-based adjustment
                 if "Short-Term" in strategy_type:
-                    adjusted_timeout = max(vision_timeout - 30, 30)  # Reduce for short-term
+                    adjusted_timeout = max(vision_timeout - 30, 30)
                 else:
                     adjusted_timeout = vision_timeout
-
                 if enable_vision_analysis:
                     status_text.text(f"🧠 Running AI analysis (Vision timeout: {adjusted_timeout}s)...")
                 else:
                     status_text.text("🧠 Running AI analysis (Vision analysis disabled)...")
-                    adjusted_timeout = 0  # Skip vision analysis
-
+                    adjusted_timeout = 0
+                # Run AI analysis and collect all candidates (simulate multi-engine)
                 analysis, recommendation = run_ai_analysis(
                     daily_fig=daily_fig,
                     timeframe_fig=timeframe_fig,
@@ -898,16 +894,38 @@ OPTIONS STRATEGY ANALYZER OUTPUT:
                     vision_timeout=adjusted_timeout,
                     options_priority=options_priority
                 )
-
-                # Step 4: Complete Analysis (100%)
+                # Add LLM/AI output as a candidate (simulate)
+                if recommendation:
+                    candidate_strategies.append({
+                        "name": recommendation.get('strategy', {}).get('name', recommendation.get('action', 'Unknown')),
+                        "timeframe": user_timeframe,
+                        "trend": features.get('trend', None),
+                        "type": recommendation.get('strategy', {}).get('name', '').lower().replace(' ', '_'),
+                        "iv_rank": features.get('iv_rank', 0),
+                        "adx": features.get('adx', 0),
+                        "rsi": features.get('rsi', 50),
+                        "confidence": recommendation.get('strategy', {}).get('confidence', 0.7),
+                        "rationale": recommendation.get('strategy', {}).get('rationale', '')
+                    })
+                # Step 4: Use strategy arbiter to select final strategy
+                final_strategy = choose_final_strategy(candidate_strategies, user_timeframe, features)
+                # Step 5: Validate output schema (if possible)
+                try:
+                    # Pass the ticker to the validation function for better adaptations
+                    validation_result = validate_ai_model_output(final_strategy, ticker=ticker)
+                    if validation_result and not isinstance(validation_result, bool):
+                        # If validation returned a transformed object, use it
+                        final_strategy = validation_result
+                        st.info("ℹ️ AI output was automatically adapted to match the required schema")
+                except Exception as schema_error:
+                    st.warning(f"⚠️ AI output failed schema validation: {schema_error}")
+                    logging.error(f"Schema validation error: {schema_error}\nData: {final_strategy}")
+                # Step 6: Complete Analysis (100%)
                 status_text.text("✅ Analysis complete!")
                 progress_bar.progress(100)
-
                 print("✅ AI MARKET ANALYSIS COMPLETED")
                 print("="*60 + "\n")
-
-                st.session_state["ai_analysis_result"] = (analysis, chart_path, recommendation)
-                # Reset the run_analysis flag to prevent re-running on page refresh
+                st.session_state["ai_analysis_result"] = (analysis, chart_path, final_strategy)
                 st.session_state['run_analysis'] = False
             except Exception as e:
                 status_text.text("❌ Analysis failed")
@@ -915,10 +933,8 @@ OPTIONS STRATEGY ANALYZER OUTPUT:
                 st.error(f"AI analysis failed: {e}")
                 import traceback
                 traceback.print_exc()
-                # Reset the run_analysis flag even if there was an error
                 st.session_state['run_analysis'] = False
             finally:
-                # Clear progress indicators after a short delay
                 import time
                 time.sleep(1)
                 progress_bar.empty()
