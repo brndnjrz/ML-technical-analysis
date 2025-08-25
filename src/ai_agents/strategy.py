@@ -3,6 +3,7 @@ from typing import Dict, Any
 import numpy as np
 import logging
 from ..trading_strategies import strategies_data, get_strategy_by_market_condition, get_strategy_by_risk_tolerance, get_strategy_by_timeframe
+from ..utils.options_strategy_cheatsheet import OPTIONS_STRATEGY_CHEATSHEET
 
 # Setup logger
 logger = logging.getLogger(__name__)
@@ -51,8 +52,7 @@ class StrategyAgent:
     def _enrich_conditions_with_options_data(self, conditions: Dict[str, Any], options_data: Dict, data: pd.DataFrame) -> Dict[str, Any]:
         """Enhance market conditions assessment with options data using the professional analyst framework."""
         try:
-            # Import the options strategy cheatsheet
-            from ..utils.options_strategy_cheatsheet import OPTIONS_STRATEGY_CHEATSHEET
+            # ...existing code...
             
             # Add options-specific conditions to the market assessment
             if not 'options' in conditions:
@@ -172,7 +172,7 @@ class StrategyAgent:
         try:
             # For options strategies, use the professional options strategy matrix from the cheatsheet
             if options_priority and 'options' in conditions:
-                from ..utils.options_strategy_cheatsheet import OPTIONS_STRATEGY_CHEATSHEET
+                # ...existing code...
                 
                 # Extract key information from conditions for options strategy selection
                 trend = conditions.get('trend', 'neutral').lower()

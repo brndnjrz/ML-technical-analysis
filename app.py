@@ -1,32 +1,21 @@
+
 import streamlit as st
 import pandas as pd
 import os
-import logging 
+import logging
 import re
 from src.analysis.indicators import determine_trend
-
-# Core functionality imports
 from src import plotter
 from src.core.data_pipeline import fetch_and_process_data
 from src.analysis.prediction import get_fundamental_metrics, predict_next_day_close
 from src.analysis.ai_analysis import run_ai_analysis
-
-# Utility imports
 from src.utils.config import DEFAULT_TICKER, DEFAULT_START_DATE, DEFAULT_END_DATE
 from src.utils.logging_config import setup_logging, set_log_level
 from src.utils.temp_manager import temp_manager, cleanup_old_temp_files
 from src.utils.metrics import get_accuracy_report
 from src.utils.vision_plotter import create_vision_optimized_chart, export_chart_for_vision
 from src.pdf_utils import generate_and_display_pdf
-
-# UI components
-from src.ui_components import (
-    render_sidebar_quick_stats, 
-    sidebar_config, 
-    sidebar_indicator_selection
-)
-
-# Data
+from src.ui_components import render_sidebar_quick_stats, sidebar_config, sidebar_indicator_selection
 from src.trading_strategies import strategies_data, get_strategy_by_name
 
 # Setup cleaner logging for Streamlit
@@ -549,7 +538,6 @@ OPTIONS STRATEGY ANALYZER OUTPUT:
             subplot_fig = go.Figure()
             daily_fig = go.Figure() 
             timeframe_fig = go.Figure()
-            
             # Add data to all charts
             for chart in [subplot_fig, daily_fig, timeframe_fig]:
                 chart.add_trace(go.Candlestick(
@@ -650,7 +638,7 @@ OPTIONS STRATEGY ANALYZER OUTPUT:
     # with tab3:
     #     if analysis_type == "Options Trading Strategy":
     #         try:
-    #             from src.ui_components.options_analyzer import display_options_analyzer
+    #
     #             display_options_analyzer(ticker_str, data, options_data.get(ticker_str, {}))
     #         except ImportError as e:
     #             st.error(f"Error loading Options Analyzer: {str(e)}")
@@ -736,10 +724,10 @@ OPTIONS STRATEGY ANALYZER OUTPUT:
     elif analysis_type == "Options Trading Strategy":
         from src.analysis.options_analysis import analyze_options_chain, get_options_cheatsheet_markdown
         from src.utils.options_strategy_cheatsheet import OPTIONS_STRATEGY_CHEATSHEET
-        
+
         st.subheader("Options Strategy Analyzer")
         col1, col2 = st.columns([2, 1])
-        
+
         with col1:
             # Extract short-term trend only
             short_term_trend = determine_trend(data.tail(20))

@@ -3,7 +3,6 @@ Options Analysis Module for Finance Application
 """
 
 import pandas as pd
-import json
 import logging
 from typing import Dict, Any, Optional
 from ..utils.options_strategy_cheatsheet import OPTIONS_STRATEGY_CHEATSHEET, get_analyst_cheatsheet_markdown
