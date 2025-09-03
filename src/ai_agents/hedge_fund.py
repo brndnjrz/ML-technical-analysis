@@ -336,20 +336,42 @@ class HedgeFundAI:
         options_data : Dict[str, Any], optional
             Options chain data if available (implied volatility, chains, etc.)
         """
-        logger.info(f"🏛️ HEDGE FUND AI: Analyzing {ticker} at ${current_price:.2f}")
+        # Import enhanced workflow logging for detailed process tracking
+        try:
+            from ..utils.workflow_logger import (log_subsection_start, log_subsection_end, 
+                                                log_step, log_timer_start, log_timer_end,
+                                                log_data_info)
+        except ImportError:
+            # Fallback to standard logging if workflow_logger is not available
+            from datetime import datetime
+            log_subsection_start = lambda x: logger.info(f"\n{'-'*40}\n📌 {x}\n{'-'*40}")
+            log_subsection_end = lambda x: logger.info(f"\n{'-'*40}\n✅ {x} COMPLETED\n{'-'*40}")
+            log_step = lambda x, emoji="▶️": logger.info(f"{emoji} {x}")
+            log_timer_start = lambda x: datetime.now()
+            log_timer_end = lambda x, y: logger.info(f"⏱️ {x} completed in {(datetime.now()-y).total_seconds():.2f}s")
+            log_data_info = lambda x, y: logger.info(f"📊 {x}: {y}")
+        
+        log_subsection_start(f"HEDGE FUND AI ANALYSIS FOR {ticker}")
+        log_data_info(f"{ticker} Current Price", f"${current_price:.2f}")
         
         try:
             # PHASE 0: Market Regime Detection
-            logger.debug("🔍 Phase 0: Detecting market regime...")
+            log_step("PHASE 0: Detecting market regime", emoji="🔍")
+            regime_start = log_timer_start("Market Regime Detection")
             regime = self.detect_regime(data, ticker, options_data)
+            log_timer_end("Market Regime Detection", regime_start)
+            log_data_info("Market Regime", regime.upper())
             
             # PHASE 1: Independent Agent Analysis
-            logger.debug("📊 Phase 1: Gathering independent agent analyses...")
+            log_step("PHASE 1: Gathering independent agent analyses", emoji="📊")
             
             # Get analysis from each specialist agent
+            analyst_start = log_timer_start("Analyst Agent Analysis")
+            log_step("Running Analyst Agent for market condition assessment", emoji="🔬")
             analyst_view = self.analyst.analyze_technical_indicators(data)
+            log_timer_end("Analyst Agent Analysis", analyst_start)
             
-                        # Add options priority to strategy agent if requested
+            # Add options priority to strategy agent if requested
             if options_priority:
                 self.config['prioritize_options_strategies'] = True
                 
@@ -360,44 +382,57 @@ class HedgeFundAI:
                     # High IC suitability score (>70) suggests iron condor strategies
                     if ic_score > 70:
                         self.config['preferred_strategies'] = ['Iron Condors', 'Credit Spreads']
-                        logger.info(f"📈 Options strategies prioritized: Iron Condors (Suitability: {ic_score:.1f})")
+                        log_step(f"Options strategies prioritized: Iron Condors (Suitability: {ic_score:.1f})", emoji="📈")
                     # Medium IC suitability (40-70) suggests covered call strategies
                     elif ic_score > 40:
                         self.config['preferred_strategies'] = ['Covered Calls', 'Cash-Secured Puts', 'Credit Spreads']
-                        logger.info(f"📈 Options strategies prioritized: Income Strategies (Suitability: {ic_score:.1f})")
+                        log_step(f"Options strategies prioritized: Income Strategies (Suitability: {ic_score:.1f})", emoji="📈")
                     # Low IC suitability (<40) suggests directional strategies
                     else:
                         self.config['preferred_strategies'] = ['Day Trading Calls/Puts', 'Swing Trading']
-                        logger.info(f"📈 Options strategies prioritized: Directional Calls/Puts (Suitability: {ic_score:.1f})")
+                        log_step(f"Options strategies prioritized: Directional Calls/Puts (Suitability: {ic_score:.1f})", emoji="📈")
                 else:
                     # Default if no specific indicators available
                     self.config['preferred_strategies'] = ['Day Trading Calls/Puts', 'Iron Condors', 'Covered Calls']
-                    logger.info("📈 Options strategies prioritized: Mixed options strategies")
+                    log_step("Options strategies prioritized: Mixed options strategies", emoji="📈")
             else:
                 # Still use the selected strategies but without preference
                 self.config['prioritize_options_strategies'] = False
                 self.config['preferred_strategies'] = ['Swing Trading', 'Day Trading Calls/Puts']
-                logger.info("📈 Using balanced strategy selection (no options priority)")
-                
+                log_step("Using balanced strategy selection (no options priority)", emoji="📈")
+            
+            # Run strategy and execution agents
+            strategy_start = log_timer_start("Strategy Agent Analysis")
+            log_step("Running Strategy Agent for trade strategy evaluation", emoji="🎯")    
             strategy_view = self.strategist.develop_strategy(analyst_view, data, options_priority, options_data)
+            log_timer_end("Strategy Agent Analysis", strategy_start)
+            
+            execution_start = log_timer_start("Execution Agent Analysis")
+            log_step("Running Execution Agent for risk and timing analysis", emoji="⏱️")
             execution_view = self.executor.generate_signals(strategy_view, data)
+            log_timer_end("Execution Agent Analysis", execution_start)
             
             # PHASE 2: Consensus Building
-            logger.debug("🤝 Phase 2: Building consensus across agents...")
+            log_step("PHASE 2: Building consensus across agents", emoji="🤝")
+            consensus_start = log_timer_start("Consensus Building")
+            log_step("Building investment committee consensus...")
             consensus_result = self._build_consensus({
                 'analyst': analyst_view,
                 'strategist': strategy_view, 
                 'executor': execution_view
             }, data, ticker, regime)  # Pass regime to consensus building
+            log_timer_end("Consensus Building", consensus_start)
             
             # PHASE 3: Risk Assessment & Final Recommendation
-            logger.debug("⚖️ Phase 3: Final risk assessment and recommendation...")
+            log_step("PHASE 3: Final risk assessment and recommendation", emoji="⚖️")
+            recommendation_start = log_timer_start("Final Recommendation Generation")
             final_recommendation = self._generate_hedge_fund_recommendation(
                 consensus_result, data, ticker, current_price, regime
             )
+            log_timer_end("Final Recommendation Generation", recommendation_start)
             
             # PHASE 4: Log prediction for accuracy tracking
-            logger.debug("📊 Phase 4: Logging prediction for accuracy measurement...")
+            log_step("PHASE 4: Logging prediction for accuracy measurement", emoji="📊")
             market_data = {
                 'current_price': current_price,
                 'RSI': data['RSI'].iloc[-1] if 'RSI' in data.columns and len(data) > 0 else 50,
@@ -418,9 +453,10 @@ class HedgeFundAI:
             final_recommendation['prediction_id'] = prediction_id
             final_recommendation['regime'] = regime
             
-            logger.info(f"✅ CONSENSUS REACHED: {final_recommendation['action']} {ticker} "
-                       f"(Confidence: {final_recommendation['strategy']['confidence']*100:.0f}%, Regime: {regime})")
+            log_step(f"CONSENSUS REACHED: {final_recommendation['action']} {ticker} "
+                   f"(Confidence: {final_recommendation['strategy']['confidence']*100:.0f}%, Regime: {regime})", emoji="✅")
             
+            log_subsection_end(f"HEDGE FUND AI ANALYSIS FOR {ticker}")
             return final_recommendation
             
         except Exception as e:

@@ -16,6 +16,13 @@ from src.utils.logging_config import setup_logging, set_log_level
 from src.utils.temp_manager import temp_manager, cleanup_old_temp_files
 from src.utils.metrics import get_accuracy_report
 from src.utils.vision_plotter import create_vision_optimized_chart, export_chart_for_vision
+from src.utils.workflow_logger import (
+    log_section_start, log_section_end, 
+    log_subsection_start, log_subsection_end,
+    log_step, log_data_info, log_prediction, 
+    log_model_performance, log_timer_start, log_timer_end,
+    log_error
+)
 from src.pdf_utils import generate_and_display_pdf
 from src.ui_components import render_sidebar_quick_stats, sidebar_config, sidebar_indicator_selection
 from src.trading_strategies import strategies_data, get_strategy_by_name
@@ -179,39 +186,47 @@ def format_professional_report(analysis, recommendation, ticker, strategy_type, 
     else:
         report += "\n* _No actionable trade parameters for HOLD recommendation._\n"
 
-    report += """
+    # Prepare text for risk assessment
+    upside_text = "limited upside" if current_rsi > 70 else "potential upside" if current_rsi < 30 else "balanced risk/reward"
+    atr_size_text = "small" if current_atr < current_price * 0.015 else "moderate" if current_atr < current_price * 0.03 else "large"
+    vix_status_text = "low" if vix < 15 else "moderate" if vix < 25 else "high"
+    
+    report += f"""
 ---
 
 ## ⚖️ Risk Assessment
 
-* **RSI Level:** {rsi_status} suggests {"limited upside" if current_rsi > 70 else "potential upside" if current_rsi < 30 else "balanced risk/reward"}.
+* **RSI Level:** {rsi_status} suggests {upside_text}.
 * **Volatility Risk:** {risk_level} → IV Rank {iv_rank:.1f}%, IV Percentile {iv_percentile:.1f}%.
-* **ATR (Daily Move):** ${current_atr:.2f} → expect {"small" if current_atr < current_price * 0.015 else "moderate" if current_atr < current_price * 0.03 else "large"} daily swings.
-* **VIX:** {vix:.1f} → market-wide volatility {"low" if vix < 15 else "moderate" if vix < 25 else "high"}.
+* **ATR (Daily Move):** ${current_atr:.2f} → expect {atr_size_text} daily swings.
+* **VIX:** {vix:.1f} → market-wide volatility {vix_status_text}.
 
 ---
 
 ## ✅ Recommendation
 
-* **{action}:** {"Trend-following setup supports" if action == "BUY" else "Technical signals suggest" if action == "SELL" else "Neutral signals recommend"} a {action.lower()} position.
 """
+    
+    # Determine recommendation text
+    action_explanation = "Trend-following setup supports" if action == "BUY" else "Technical signals suggest" if action == "SELL" else "Neutral signals recommend"
+    
+    report += f"* **{action}:** {action_explanation} a {action.lower()} position."
+
     if action in ["BUY", "SELL"]:
         report += f"\n* **Stop:** Place {'below' if action == 'BUY' else 'above'} ${stop_loss:.2f} (to limit downside)."
         report += f"\n* **Take Profit:** ${profit_target:.2f} zone."
-        report += f"\n* **Options Play:** {"Call strategies preferred" if action == "BUY" else "Put strategies preferred"} in {"low" if iv_rank < 30 else "high"} IV environment."
+        options_play = "Call strategies preferred" if action == "BUY" else "Put strategies preferred"
+        iv_env = "low" if iv_rank < 30 else "high"
+        report += f"\n* **Options Play:** {options_play} in {iv_env} IV environment."
     else:
         report += "\n* _No stop loss, take profit, or options play for HOLD recommendation._"
 
-    report += """
----
-
-## ⚠️ Risk Warning
-
-This is AI-generated analysis for **educational purposes only**.
-Always perform your own due diligence. Not financial advice.
-
----
-"""
+    # Add Risk Warning section
+    report += "\n\n---\n\n"
+    report += "## ⚠️ Risk Warning\n\n"
+    report += "This is AI-generated analysis for **educational purposes only**.\n"
+    report += "Always perform your own due diligence. Not financial advice.\n\n"
+    report += "---"
     return report
 
 # Set Up Streamlit App UI 
@@ -313,19 +328,31 @@ if st.sidebar.button("🔄 Fetch & Analyze Data", type="primary"):
     status_text = st.sidebar.empty()
     
     try:
+        log_section_start("DATA FETCHING WORKFLOW")
+        
         status_text.text("📈 Fetching market data...")
+        log_step(f"Fetching data for {ticker} from {start_date} to {end_date} with {interval} interval", "📊")
+        
+        start_time = log_timer_start(f"Data fetch for {ticker}")
         progress_bar.progress(25)
         
         data, levels, options_data = fetch_and_process_data(
             ticker, start_date, end_date, interval, strategy_type, analysis_type, 
             active_indicators
         )
+        log_timer_end(f"Data fetch for {ticker}", start_time)
+        
         progress_bar.progress(75)
         
         if data is not None:
+            log_data_info(f"{ticker} stock data loaded", data)
+            log_step(f"Found {len(levels.get('support', []))} support levels and {len(levels.get('resistance', []))} resistance levels", "📏")
+            
             status_text.text("🔧 Calculating indicators...")
             st.session_state["stock_data"] = data
             st.session_state["levels"] = levels
+            
+            log_section_end("DATA FETCHING WORKFLOW")
             st.session_state["options_data"] = options_data
             st.session_state["active_indicators"] = active_indicators
             
@@ -626,22 +653,15 @@ OPTIONS STRATEGY ANALYZER OUTPUT:
                     action_color = "🟡"
                     action_style = "info"
                 
-                st.markdown(f"""
-                <div style="
-                    background: linear-gradient(90deg, #f0f2f6 0%, #ffffff 100%);
-                    padding: 20px;
-                    border-radius: 10px;
-                    border-left: 5px solid #1f77b4;
-                    margin: 10px 0;
-                ">
-                    <h4 style="margin: 0; color: #1f77b4;">📋 Analysis Summary</h4>
-                    <p style="margin: 5px 0; font-size: 18px;">
-                        <strong>Recommendation:</strong> {action_color} <strong>{action}</strong> 
-                        | <strong>Strategy:</strong> {strategy_name} 
-                        | <strong>Confidence:</strong> {confidence:.0f}%
-                    </p>
-                </div>
-                """, unsafe_allow_html=True)
+                html_content = f'<div style="background: linear-gradient(90deg, #f0f2f6 0%, #ffffff 100%); padding: 20px; border-radius: 10px; border-left: 5px solid #1f77b4; margin: 10px 0;">'
+                html_content += f'<h4 style="margin: 0; color: #1f77b4;">📋 Analysis Summary</h4>'
+                html_content += f'<p style="margin: 5px 0; font-size: 18px;">'
+                html_content += f'<strong>Recommendation:</strong> {action_color} <strong>{action}</strong> | <strong>Strategy:</strong> {strategy_name}'
+                html_content += f' | <strong>Confidence:</strong> {confidence:.0f}%</p>'
+                html_content += '</div>'
+                
+                # Display the HTML content
+                st.markdown(html_content, unsafe_allow_html=True)
                 
                 # Display the full analysis
                 st.markdown(formatted_analysis)
@@ -875,15 +895,26 @@ OPTIONS STRATEGY ANALYZER OUTPUT:
             status_text.text("🧠 Running AI analysis...")
             progress_bar.progress(60)
             try:
+                # Import workflow logger for enhanced logging
+                from src.utils.workflow_logger import log_section_start, log_section_end, log_timer_start, log_timer_end
+                
+                # Configure and log AI analysis parameters
                 if "Short-Term" in strategy_type:
                     adjusted_timeout = max(vision_timeout - 30, 30)
                 else:
                     adjusted_timeout = vision_timeout
+                    
                 if enable_vision_analysis:
                     status_text.text(f"🧠 Running AI analysis (Vision timeout: {adjusted_timeout}s)...")
+                    log_section_start(f"AI MARKET ANALYSIS FOR {ticker} (with Vision)")
                 else:
                     status_text.text("🧠 Running AI analysis (Vision analysis disabled)...")
                     adjusted_timeout = 0
+                    log_section_start(f"AI MARKET ANALYSIS FOR {ticker} (Vision disabled)")
+                
+                # Start timer for overall AI analysis performance tracking
+                ai_analysis_timer = log_timer_start("AI Analysis Execution")
+                
                 # Run AI analysis and collect all candidates (simulate multi-engine)
                 analysis, recommendation = run_ai_analysis(
                     daily_fig=daily_fig,
@@ -894,6 +925,9 @@ OPTIONS STRATEGY ANALYZER OUTPUT:
                     vision_timeout=adjusted_timeout,
                     options_priority=options_priority
                 )
+                
+                # Log completion time for AI analysis
+                log_timer_end("AI Analysis Execution", ai_analysis_timer)
                 # Add LLM/AI output as a candidate (simulate)
                 if recommendation:
                     candidate_strategies.append({
@@ -911,20 +945,27 @@ OPTIONS STRATEGY ANALYZER OUTPUT:
                 final_strategy = choose_final_strategy(candidate_strategies, user_timeframe, features)
                 # Step 5: Validate output schema (if possible)
                 try:
+                    from src.utils.workflow_logger import log_step
+                    
+                    log_step("Validating AI output schema", emoji="🔍")
                     # Pass the ticker to the validation function for better adaptations
                     validation_result = validate_ai_model_output(final_strategy, ticker=ticker)
                     if validation_result and not isinstance(validation_result, bool):
                         # If validation returned a transformed object, use it
                         final_strategy = validation_result
+                        log_step("AI output was automatically adapted to match the required schema", emoji="ℹ️")
                         st.info("ℹ️ AI output was automatically adapted to match the required schema")
+                    else:
+                        log_step("AI output validation passed", emoji="✅")
                 except Exception as schema_error:
+                    log_step(f"AI output failed schema validation: {schema_error}", emoji="⚠️")
                     st.warning(f"⚠️ AI output failed schema validation: {schema_error}")
                     logging.error(f"Schema validation error: {schema_error}\nData: {final_strategy}")
+                
                 # Step 6: Complete Analysis (100%)
                 status_text.text("✅ Analysis complete!")
                 progress_bar.progress(100)
-                print("✅ AI MARKET ANALYSIS COMPLETED")
-                print("="*60 + "\n")
+                log_section_end(f"AI MARKET ANALYSIS FOR {ticker}")
                 st.session_state["ai_analysis_result"] = (analysis, chart_path, final_strategy)
                 st.session_state['run_analysis'] = False
             except Exception as e:

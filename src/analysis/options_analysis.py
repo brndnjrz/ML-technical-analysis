@@ -4,11 +4,136 @@ Options Analysis Module for Finance Application
 
 import pandas as pd
 import logging
-from typing import Dict, Any, Optional
+import time
+import requests
+import json
+from datetime import datetime, timedelta
+from typing import Dict, Any, Optional, List, Union
 from ..utils.options_strategy_cheatsheet import OPTIONS_STRATEGY_CHEATSHEET, get_analyst_cheatsheet_markdown
 
 # Setup logger
 logger = logging.getLogger(__name__)
+
+def fetch_options_data(ticker: str, use_cache: bool = True, days_to_expiry: int = 30) -> Dict[str, Any]:
+    """
+    Fetch options chain data for a given ticker.
+    
+    Args:
+        ticker: Stock symbol (e.g., 'AAPL', 'SPY')
+        use_cache: Whether to use cached data if available and recent
+        days_to_expiry: Target days to expiration for focusing analysis
+        
+    Returns:
+        Dictionary containing:
+        - expirations: List of expiration dates
+        - iv_data: Implied volatility metrics
+        - calls: Call options for selected expiration
+        - puts: Put options for selected expiration
+        - atm_strike: At-the-money strike price
+    """
+    logger.info(f"Fetching options data for {ticker.upper()}...")
+    
+    try:
+        # Use a simple mock implementation for development/testing
+        # In production, replace with actual API calls to a data provider
+        
+        # Mock current stock price (normally you'd get this from a real API)
+        import yfinance as yf
+        try:
+            ticker_data = yf.Ticker(ticker)
+            current_price = ticker_data.history(period="1d")["Close"].iloc[-1]
+        except Exception as e:
+            logger.warning(f"Error getting current price from yfinance: {e}")
+            # Fallback mock price
+            current_price = 100.0 if ticker.upper() != "SPY" else 450.0
+            
+        # Generate fake expiration dates
+        today = datetime.now()
+        expirations = []
+        for i in range(1, 6):  # Weekly expirations
+            expiry = today + timedelta(days=i*7)
+            # Format as YYYY-MM-DD
+            expirations.append(expiry.strftime("%Y-%m-%d"))
+        
+        for i in range(1, 4):  # Monthly expirations
+            expiry = today + timedelta(days=i*30)
+            # Format as YYYY-MM-DD
+            expirations.append(expiry.strftime("%Y-%m-%d"))
+            
+        # Select target expiration (closest to requested days to expiry)
+        target_date = today + timedelta(days=days_to_expiry)
+        closest_expiry = min(expirations, key=lambda x: abs((datetime.strptime(x, "%Y-%m-%d") - target_date).days))
+        
+        # Calculate ATM strike based on current price
+        atm_strike = round(current_price / 5) * 5  # Round to nearest $5
+        
+        # Generate mock options chain data
+        iv_data = {
+            "iv_rank": 45.2,  # IV Rank (0-100)
+            "iv_percentile": 38.7,  # IV Percentile (0-100)
+            "hv_30": 22.5,  # 30-day historical volatility
+            "iv_30": 25.8,  # 30-day implied volatility
+            "iv_term_structure": [
+                {"days": 7, "iv": 24.2},
+                {"days": 14, "iv": 25.1},
+                {"days": 30, "iv": 25.8},
+                {"days": 60, "iv": 26.9}
+            ]
+        }
+        
+        # Generate mock call options
+        calls = []
+        for i in range(-5, 6):  # 11 strikes centered around ATM
+            strike = atm_strike + (i * 5)
+            calls.append({
+                "strike": strike,
+                "expiry": closest_expiry,
+                "bid": max(0.05, round((current_price - strike + 5) * 0.1, 2)),
+                "ask": max(0.10, round((current_price - strike + 5) * 0.1 + 0.15, 2)),
+                "iv": max(10, iv_data["iv_30"] - (i * 1.2)),  # IV smile
+                "delta": max(0.01, min(0.99, 0.5 + (0.1 * i))),
+                "gamma": round(0.05 - abs(i * 0.008), 3),
+                "theta": round(-0.03 - abs(i * 0.005), 3),
+                "volume": int(100 * (5 - abs(i))),
+                "open_interest": int(500 * (5 - abs(i)))
+            })
+            
+        # Generate mock put options
+        puts = []
+        for i in range(-5, 6):  # 11 strikes centered around ATM
+            strike = atm_strike + (i * 5)
+            puts.append({
+                "strike": strike,
+                "expiry": closest_expiry,
+                "bid": max(0.05, round((strike - current_price + 5) * 0.1, 2)),
+                "ask": max(0.10, round((strike - current_price + 5) * 0.1 + 0.15, 2)),
+                "iv": max(10, iv_data["iv_30"] - (i * 1.2)),  # IV smile
+                "delta": max(-0.99, min(-0.01, -0.5 - (0.1 * i))),
+                "gamma": round(0.05 - abs(i * 0.008), 3),
+                "theta": round(-0.03 - abs(i * 0.005), 3),
+                "volume": int(80 * (5 - abs(i))),
+                "open_interest": int(400 * (5 - abs(i)))
+            })
+            
+        # Return compiled options data
+        options_data = {
+            "ticker": ticker.upper(),
+            "price": current_price,
+            "timestamp": datetime.now().isoformat(),
+            "expirations": expirations,
+            "selected_expiry": closest_expiry,
+            "days_to_expiry": (datetime.strptime(closest_expiry, "%Y-%m-%d") - today).days,
+            "iv_data": iv_data,
+            "calls": calls,
+            "puts": puts,
+            "atm_strike": atm_strike
+        }
+        
+        return options_data
+        
+    except Exception as e:
+        logger.error(f"Error fetching options data: {str(e)}")
+        return None
 
 def analyze_options_chain(
     data: pd.DataFrame, 
