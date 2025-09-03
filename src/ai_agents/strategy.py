@@ -3,6 +3,7 @@ from typing import Dict, Any
 import numpy as np
 import logging
 from ..trading_strategies import strategies_data, get_strategy_by_market_condition, get_strategy_by_risk_tolerance, get_strategy_by_timeframe
+from ..utils.options_strategy_cheatsheet import OPTIONS_STRATEGY_CHEATSHEET
 
 # Setup logger
 logger = logging.getLogger(__name__)
@@ -49,11 +50,22 @@ class StrategyAgent:
         return strategy
         
     def _enrich_conditions_with_options_data(self, conditions: Dict[str, Any], options_data: Dict, data: pd.DataFrame) -> Dict[str, Any]:
-        """Enhance market conditions assessment with options data."""
+        """Enhance market conditions assessment with options data using the professional analyst framework."""
         try:
+            # ...existing code...
+            
             # Add options-specific conditions to the market assessment
             if not 'options' in conditions:
                 conditions['options'] = {}
+                
+            # Apply the 5-step analyst process from the cheatsheet
+            conditions['options']['analyst_process'] = {
+                'step1': OPTIONS_STRATEGY_CHEATSHEET['step1_market_trend']['description'],
+                'step2': OPTIONS_STRATEGY_CHEATSHEET['step2_volatility_check']['description'],
+                'step3': OPTIONS_STRATEGY_CHEATSHEET['step3_strength_momentum']['description'],
+                'step4': OPTIONS_STRATEGY_CHEATSHEET['step4_support_resistance']['description'],
+                'step5': OPTIONS_STRATEGY_CHEATSHEET['step5_strategy_selection']['description']
+            }
                 
             # Get implied volatility if available
             if 'implied_volatility' in options_data:
@@ -158,7 +170,44 @@ class StrategyAgent:
         }
         
         try:
-            # Enhanced strategy selection using trading_strategies.py data
+            # For options strategies, use the professional options strategy matrix from the cheatsheet
+            if options_priority and 'options' in conditions:
+                # ...existing code...
+                
+                # Extract key information from conditions for options strategy selection
+                trend = conditions.get('trend', 'neutral').lower()
+                
+                # Determine if IV is high or low
+                iv_high = False
+                if 'options' in conditions and 'iv_rank' in conditions['options']:
+                    iv_high = conditions['options']['iv_rank'] > 50
+                
+                # Build options strategy key
+                if trend == 'bullish':
+                    options_key = 'bullish_high_iv' if iv_high else 'bullish_low_iv'
+                elif trend == 'bearish':
+                    options_key = 'bearish_high_iv' if iv_high else 'bearish_low_iv'
+                else:
+                    options_key = 'neutral_high_iv' if iv_high else 'neutral_low_iv'
+                
+                # Get strategy from the options matrix
+                if options_key in OPTIONS_STRATEGY_CHEATSHEET['step5_strategy_selection']['matrix']:
+                    strategy_matrix = OPTIONS_STRATEGY_CHEATSHEET['step5_strategy_selection']['matrix'][options_key]
+                    strategy.update({
+                        'name': strategy_matrix['strategy'],
+                        'type': trend,
+                        'description': f"Options strategy for {trend} market with {'high' if iv_high else 'low'} implied volatility",
+                        'rationale': strategy_matrix['rationale'],
+                        'timeframe': 'short-term',
+                        'options_strategy': True
+                    })
+                    
+                    # Add risk management rules
+                    strategy['risk_management'] = OPTIONS_STRATEGY_CHEATSHEET['step6_risk_management']['rules']
+                    
+                    return strategy
+            
+            # Fall back to standard strategy selection for non-options trades
             selected_strategy_info = self._match_strategy_to_conditions(conditions, data, options_priority)
             
             if selected_strategy_info:
@@ -285,20 +334,19 @@ class StrategyAgent:
         
         try:
             strategy_name = strategy_data['Strategy']
-            
             # Base parameters from strategy timeframe
             timeframe_info = strategy_data.get('Timeframe Used With', '')
             if 'days' in timeframe_info.lower() or 'weeks' in timeframe_info.lower():
-                parameters['holding_period'] = 'medium_term'
+                parameters['holding_period'] = 'short_term'
             elif 'minutes' in timeframe_info.lower() or 'hours' in timeframe_info.lower():
                 parameters['holding_period'] = 'short_term'
             else:
-                parameters['holding_period'] = 'flexible'
-            
+                parameters['holding_period'] = 'short_term'
             # Get price data from conditions instead of self.data
             price_data = conditions.get('price_data', {})
             current_price = price_data.get('current_price')
-            
+            # Always include 'final_recommendation' key, even if empty
+            parameters['final_recommendation'] = {}
             # If we have price data and this is an options strategy, add comprehensive strike selection
             if current_price is not None and strategy_name in [
                 'Day Trading Calls/Puts', 'Iron Condors', 'Swing Trading',
@@ -311,8 +359,7 @@ class StrategyAgent:
                     'itm_strike': round(current_price * 0.95),
                     'otm_strike': round(current_price * 1.05)
                 }
-                parameters['strike_info'] = strike_info['final_recommendation']
-            
+                parameters['final_recommendation'] = strike_info
             # Strategy-specific parameters (only for approved strategies)
             if strategy_name == 'Day Trading Calls/Puts':
                 parameters.update({

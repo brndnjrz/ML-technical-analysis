@@ -22,6 +22,29 @@ class RiskLevel(str, Enum):
     MEDIUM = "medium" 
     HIGH = "high"
 
+class OptionsAnalysisSchema(BaseModel):
+    """Schema for options strategy recommendations"""
+    
+    iv_environment: str = Field(
+        default="medium", 
+        description="Implied volatility environment assessment (high, medium, low)"
+    )
+    
+    recommended_strategy: str = Field(
+        default="", 
+        description="Recommended options strategy based on market conditions"
+    )
+    
+    strike_selection: str = Field(
+        default="", 
+        description="Guidance for selecting appropriate strike prices"
+    )
+    
+    risk_reward_ratio: str = Field(
+        default="1:1", 
+        description="Expected risk-reward ratio for the strategy"
+    )
+
 class VisionAnalysisSchema(BaseModel):
     """Structured schema for vision AI analysis output"""
     
@@ -46,6 +69,11 @@ class VisionAnalysisSchema(BaseModel):
     
     risk: RiskLevel = Field(
         description="Risk assessment based on volatility and market conditions"
+    )
+    
+    options_analysis: Optional[OptionsAnalysisSchema] = Field(
+        default=None,
+        description="Options strategy analysis and recommendations"
     )
     
     confidence: float = Field(
@@ -369,6 +397,12 @@ class StructuredVisionParser:
             'confidence': 0.3,  # Low confidence for fallback
             'pattern_recognition': [],
             'volume_analysis': None,
+            'options_analysis': {
+                'iv_environment': 'medium',
+                'recommended_strategy': 'iron condor',
+                'strike_selection': 'near support/resistance',
+                'risk_reward_ratio': '1:1'
+            },
             'schema_validation': 'fallback',
             'note': 'Fallback analysis due to parsing failure'
         }
@@ -383,12 +417,13 @@ def parse_vision_analysis(raw_output: str, current_price: float = 0) -> Dict[str
 def create_vision_prompt_template(ticker: str, timeframe: str, current_price: float, 
                                 atr: float, rsi: float, iv_rank: float) -> str:
     """
-    Create standardized vision analysis prompt template with improved JSON formatting
+    Create standardized vision analysis prompt template with improved JSON formatting 
+    and professional options analysis guidance
     """
     return f"""
 IMPORTANT: Respond with ONLY the JSON object below, no additional text, no explanations, no markdown formatting.
 
-Analyze this {timeframe} chart for {ticker} and return this exact JSON structure:
+Analyze this {timeframe} chart for {ticker} using professional options analyst methodology and return this exact JSON structure:
 
 {{
     "trend": "bullish",
@@ -401,7 +436,13 @@ Analyze this {timeframe} chart for {ticker} and return this exact JSON structure
     "risk": "medium",
     "confidence": 0.75,
     "pattern_recognition": ["ascending triangle", "volume breakout"],
-    "volume_analysis": "increasing volume on breakout"
+    "volume_analysis": "increasing volume on breakout",
+    "options_analysis": {{
+        "iv_environment": "high",
+        "recommended_strategy": "bull put spread",
+        "strike_selection": "support at 120.00",
+        "risk_reward_ratio": "2:1"
+    }}
 }}
 
 Context for your analysis:
@@ -409,6 +450,17 @@ Context for your analysis:
 - ATR (daily volatility): ${atr:.2f} ({atr/current_price*100:.1f}%)
 - RSI: {rsi:.1f}
 - IV Rank: {iv_rank:.1f}%
+
+Apply this professional options strategy framework:
+1. First identify the trend (bullish, bearish, neutral)
+2. Assess volatility environment (IV Rank > 50% = high, < 50% = low)
+3. Identify key support/resistance levels for strike selection
+4. For bullish + high IV: recommend bull put credit spreads
+5. For bullish + low IV: recommend long calls or bull call spreads
+6. For bearish + high IV: recommend bear call credit spreads
+7. For bearish + low IV: recommend long puts or bear put spreads
+8. For neutral + high IV: recommend iron condors
+9. For neutral + low IV: recommend straddles/strangles
 
 Strict Rules:
 1. Return ONLY the JSON object - no text before or after
@@ -418,6 +470,7 @@ Strict Rules:
 5. No levels outside ${current_price*0.8:.2f} - ${current_price*1.2:.2f} range
 6. Use null for uncertain values, not "null" string
 7. Use "low", "medium", or "high" for risk
+8. Always include options_analysis section with strategy based on the framework
 8. Confidence must be 0.1 to 0.9 decimal
 
 JSON ONLY - NO OTHER TEXT

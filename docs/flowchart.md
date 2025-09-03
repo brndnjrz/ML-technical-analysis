@@ -1,4 +1,10 @@
-# Updated AI Trading System Flowchart - With Accuracy Optimization
+# Updated AI Trading System Flowchart - With Accuracy Optimization & Robust Error Handling
+
+> **Update:**
+> - All strategy outputs now include every required key (Description, Timeframe, Pros, Cons, When to Use, Suitable For, final_recommendation).
+> - Robust error handling and fallback logic: UI and agents always display a default or fallback value if any key is missing.
+> - Multi-agent consensus and fallback logic ensure the app never crashes due to missing data.
+> - Professional reporting and PDF generation are now resilient to incomplete data.
 
 ```mermaid
 flowchart TD
@@ -44,9 +50,22 @@ flowchart TD
     N1 -- No --> N2[Conflict Resolution<br/>& Risk Override]:::consensus
     N1 -- Yes --> N3[✅ Hedge Fund Recommendation]:::consensus
     N2 --> N3
+    
+    %% PHASE 4.5: STRATEGY ARBITER & SCHEMA VALIDATION
+    N3 --> SA[🏆 Strategy Arbiter:<br/>• Score candidate strategies<br/>• Filter by timeframe<br/>• Match with market regime<br/>• Select highest-scoring strategy]:::arbiter
+    SA --> SV[📋 Schema Validation:<br/>• Validate against JSON schema<br/>• Check required fields<br/>• Verify data types]:::validation
+    SV --> SV1{Schema Valid?}:::decision
+    SV1 -- Yes --> SV2[✅ Use Original Output]:::validation
+    SV1 -- No --> SV3[🔄 Data Adaptation:<br/>• Transform flat to nested structure<br/>• Handle null values<br/>• Add missing fields]:::adaptation
+    SV3 --> SV4{Adaptation Success?}:::decision
+    SV4 -- Yes --> SV5[✅ Use Adapted Output]:::validation
+    SV4 -- No --> SV6[⚠️ Use Default Fallbacks]:::adaptation
+    SV2 --> SV7[Final Validated Output]:::validation
+    SV5 --> SV7
+    SV6 --> SV7
 
     %% PHASE 5: VISION ANALYSIS (IF ENABLED)
-    N3 --> O1{Vision Analysis?}:::decision
+    SV7 --> O1{Vision Analysis?}:::decision
     O1 -- No --> P1[Quantitative-Only Analysis]:::process
     O1 -- Yes --> O2[🎨 Vision-Optimized Chart<br/>Processing with AI Model]:::vision
     O2 --> O3[📋 Structured Schema Validation:<br/>• Pydantic model enforcement<br/>• JSON extraction + fallback<br/>• Price bounds validation<br/>• Confidence scoring]:::vision
@@ -100,6 +119,9 @@ flowchart TD
     classDef fusion fill:#ffffe6,stroke:#cccc00,stroke-width:2px,color:#000;
     classDef options fill:#f2e6ff,stroke:#9933cc,stroke-width:1.5px,color:#000;
     classDef accuracy fill:#ccffcc,stroke:#00cc66,stroke-width:2px,color:#000;
+    classDef arbiter fill:#d5f5e3,stroke:#1e8449,stroke-width:2px,color:#000;
+    classDef validation fill:#fadbd8,stroke:#943126,stroke-width:1.5px,color:#000;
+    classDef adaptation fill:#ebdef0,stroke:#8e44ad,stroke-width:1.5px,color:#000;
     classDef error fill:#ffcccc,stroke:#cc3333,stroke-width:1px,color:#000;
 
     %% Apply classes

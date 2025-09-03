@@ -26,6 +26,7 @@ Finance/
 │   │   ├── strategy.py       # Strategy selection agent
 │   │   ├── execution.py      # Execution timing agent
 │   │   ├── backtest.py       # Backtesting agent
+│   │   ├── strategy_arbiter.py # Strategy scoring and selection
 │   │   └── hedge_fund.py     # Orchestrator agent
 │   ├── ui_components/        # Streamlit UI components
 │   │   ├── __init__.py
@@ -38,6 +39,8 @@ Finance/
 │   │   ├── __init__.py
 │   │   ├── config.py         # Configuration constants
 │   │   ├── logging_config.py # Logging setup
+│   │   ├── ai_output_schema.py # Schema validation for AI outputs
+│   │   ├── metrics.py        # Accuracy tracking metrics
 │   │   └── temp_manager.py   # Temporary file management
 │   ├── plotter.py            # Chart generation
 │   ├── pdf_generator.py      # PDF report generation
@@ -92,6 +95,10 @@ Finance/
 from src.core.data_pipeline import fetch_and_process_data
 from src.analysis.prediction import predict_next_day_close
 from src.analysis.ai_analysis import run_ai_analysis
+
+# AI components
+from src.ai_agents.strategy_arbiter import choose_final_strategy
+from src.utils.ai_output_schema import validate_ai_model_output
 
 # Utilities
 from src.utils.config import DEFAULT_TICKER

@@ -54,8 +54,8 @@ def sidebar_config(config=None):
     if analysis_type == "Options Trading Strategy":
         strategy_type = st.sidebar.selectbox(
             "Trading Timeframe:",
-            ["Short-Term (1-7 days)", "Medium-Term (1-3 weeks)"],
-            index=1
+            ["Short-Term (1-7 days)"],
+            index=0
         )
         
         # AI will automatically select the optimal strategy
@@ -66,14 +66,11 @@ def sidebar_config(config=None):
         with st.sidebar.expander("What strategies will be considered?"):
             strategy_names = get_strategy_names()
             st.markdown("The AI system will analyze market conditions to select the optimal strategy from:")
-            
             for strategy in strategy_names:
                 st.markdown(f"• **{strategy}**")
-            
             st.markdown("""
-            Each strategy includes multiple timeframes:
+            Each strategy includes:
             - **Short-Term (1–7 days)**: Quick moves and scalping
-            - **Medium-Term (1–3 weeks)**: Trend-following and income generation
             - **Intraday**: Minutes to hours for day trading
             """)
             
@@ -83,13 +80,11 @@ def sidebar_config(config=None):
     elif analysis_type == "Stock Buy/Hold/Sell":
         strategy_type = st.sidebar.selectbox(
             "Trading Timeframe:",
-            ["Short-Term (1-7 days)", "Medium-Term (1-3 weeks)"],
-            index=1
+            ["Short-Term (1-7 days)"],
+            index=0
         )
         if "Short-Term" in strategy_type:
             options_strategy = "Day Trading"
-        elif "Medium-Term" in strategy_type:
-            options_strategy = "Swing Trading"
     
     # Options Priority Checkbox
     options_priority = False

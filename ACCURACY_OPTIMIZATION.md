@@ -133,6 +133,40 @@ report = get_accuracy_report(days_back=30)
 - Regime-specific performance breakdown
 - Calibration and hit rate monitoring
 
+### 9. Schema Validation & Adaptation (`src/utils/ai_output_schema.py`)
+
+**What it does:**
+- Enforces consistent structure for AI outputs
+- Provides intelligent adaptation for non-conforming data
+- Ensures graceful degradation with sensible fallbacks
+
+**Key Features:**
+- JSON Schema validation with descriptive fields
+- Automatic adaptation of flat to nested structures
+- Null value handling for numeric fields
+- Fallback generation with appropriate default values
+
+**Benefits:**
+- Prevents crashes from malformed AI outputs
+- Maintains consistency across different models and agents
+- Improves reliability in production environments
+- Enhances accuracy by standardizing data formats
+
+**Usage:**
+```python
+from src.utils.ai_output_schema import validate_ai_model_output
+
+# Validate and potentially adapt AI model output
+try:
+    validation_result = validate_ai_model_output(strategy_data, ticker="SPY")
+    if validation_result and not isinstance(validation_result, bool):
+        # Use the adapted data if validation transformed the structure
+        strategy_data = validation_result
+except Exception as e:
+    # Fallback handling with appropriate default values
+    logging.error(f"Validation error: {str(e)}")
+```
+
 ## 📊 Accuracy Measurement Framework
 
 ### Metrics Tracked

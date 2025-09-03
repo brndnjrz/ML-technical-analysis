@@ -3,7 +3,6 @@ Enhanced deterministic chart generation for AI vision analysis.
 Creates standardized, labeled charts optimized for machine learning models.
 """
 import plotly.graph_objects as go
-import plotly.subplots as sp
 from plotly.subplots import make_subplots
 import pandas as pd
 import numpy as np

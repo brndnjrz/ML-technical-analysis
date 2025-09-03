@@ -10,6 +10,7 @@ import json
 import time
 import logging
 from .vision_schema import parse_vision_analysis, create_vision_prompt_template
+from ..utils.options_strategy_cheatsheet import OPTIONS_STRATEGY_CHEATSHEET
 
 # Setup logger for AI analysis
 logger = logging.getLogger(__name__)
@@ -110,26 +111,30 @@ def run_ai_analysis(daily_fig, timeframe_fig, data: pd.DataFrame, ticker: str, p
         options_priority: Whether to prioritize options strategies (default: True)
     """
     
-    print("🤖 AI HEDGE FUND ANALYSIS STARTING")
-    print("=" * 50)
+    # Import workflow logger for enhanced logging
+    from ..utils.workflow_logger import (log_section_start, log_section_end, 
+                                         log_step, log_timer_start, log_timer_end)
+    
+    log_section_start(f"AI ANALYSIS FOR {ticker}")
+    ai_start_time = log_timer_start("AI Analysis")
     
     # 1. Get AI Hedge Fund Consensus Analysis
-    print("🏦 Running Hedge Fund AI Analysis...")
-    print("   • Analyst Agent: Market condition assessment")
-    print("   • Strategy Agent: Trade strategy evaluation") 
-    print("   • Execution Agent: Risk and timing analysis")
-    print("   • Building investment committee consensus...")
+    log_step("Running Hedge Fund AI Analysis", emoji="🏦")
+    log_step("   • Analyst Agent: Market condition assessment")
+    log_step("   • Strategy Agent: Trade strategy evaluation") 
+    log_step("   • Execution Agent: Risk and timing analysis")
+    log_step("   • Building investment committee consensus...")
     
     # Check if we should prioritize options strategies (calls, puts, and iron condors)
     # Use the options_priority parameter from the UI checkbox
     if options_priority:
-        print("📈 Prioritizing options strategies (calls, puts, and iron condors)")
+        log_step("Prioritizing options strategies (calls, puts, and iron condors)", emoji="📈")
         config = {
             'prioritize_options_strategies': True,
             'preferred_strategies': ['Day Trading Calls/Puts', 'Iron Condors', 'Credit Spreads']
         }
     else:
-        print("📈 Using balanced strategy mix (stocks and options)")
+        log_step("Using balanced strategy mix (stocks and options)", emoji="📈")
         config = {}
     
     ai_system = HedgeFundAI(config)
@@ -143,10 +148,11 @@ def run_ai_analysis(daily_fig, timeframe_fig, data: pd.DataFrame, ticker: str, p
         import streamlit as st
         if 'options' in st.session_state and ticker in st.session_state['options']:
             options_data = st.session_state['options'][ticker]
-            print("📊 Adding options metrics to analysis")
+            log_step("Adding options metrics to analysis", emoji="📊")
     except (ImportError, KeyError, TypeError):
-        print("⚠️ No options data available for analysis")
+        log_step("No options data available for analysis", emoji="⚠️")
     
+    hedge_fund_start = log_timer_start("Hedge Fund AI Analysis")
     recommendation = ai_system.analyze_and_recommend(
         data, 
         ticker, 
@@ -154,37 +160,40 @@ def run_ai_analysis(daily_fig, timeframe_fig, data: pd.DataFrame, ticker: str, p
         options_priority, 
         options_data=options_data
     )
+    log_timer_end("Hedge Fund AI Analysis", hedge_fund_start)
     
     # Show consensus details if available
     if 'consensus_details' in recommendation:
         consensus = recommendation['consensus_details']
-        print(f"\n📋 CONSENSUS BUILDING RESULTS:")
-        print(f"   • Agreement Score: {consensus.get('agreement_score', 0):.1%}")
-        print(f"   • Consensus Threshold: {consensus.get('threshold', 0.6):.0%}")
-        print(f"   • Decision Status: {'✅ CONSENSUS REACHED' if consensus.get('consensus_reached', False) else '⚠️ CONFLICT DETECTED'}")
+        log_step("\nCONSENSUS BUILDING RESULTS:", emoji="📋")
+        log_step(f"   • Agreement Score: {consensus.get('agreement_score', 0):.1%}")
+        log_step(f"   • Consensus Threshold: {consensus.get('threshold', 0.6):.0%}")
+        log_step(f"   • Decision Status: {'✅ CONSENSUS REACHED' if consensus.get('consensus_reached', False) else '⚠️ CONFLICT DETECTED'}")
         
         if not consensus.get('consensus_reached', False):
             conflicts = consensus.get('conflicts', [])
             if conflicts:
-                print(f"   • Conflicts Resolved: {len(conflicts)} strategy conflicts addressed")
+                log_step(f"   • Conflicts Resolved: {len(conflicts)} strategy conflicts addressed")
     
     # Log formatted summary instead of raw JSON
     recommendation['options_priority'] = options_priority  # Add options priority to recommendation
     summary = format_recommendation_summary(recommendation, options_priority)
-    print(summary)
+    log_step(summary)
 
     # 2. Get Vision Model Analysis
-    print("\n👁️ Starting visual chart analysis...")
+    log_step("\nStarting visual chart analysis...", emoji="👁️")
     
     # Check if Ollama is available
     try:
-        print("🔌 Checking Ollama connection...")
+        log_step("Checking Ollama connection...", emoji="🔌")
         # Try a simple ping to Ollama first
+        ollama_start = log_timer_start("Ollama Connection Test")
         test_response = ollama.list()
-        print("✅ Ollama service is running")
+        log_timer_end("Ollama Connection Test", ollama_start)
+        log_step("Ollama service is running", emoji="✅")
         
         # Debug: print the response type (but not the full response to avoid clutter)
-        print(f"🔍 Ollama response type: {type(test_response).__name__}")
+        log_step(f"Ollama response type: {type(test_response).__name__}", emoji="🔍")
         
         # Check if vision model is available with safer access
         available_models = []
@@ -212,20 +221,20 @@ def run_ai_analysis(daily_fig, timeframe_fig, data: pd.DataFrame, ticker: str, p
                         # Handle case where model is a string directly
                         available_models.append(str(model))
             else:
-                print(f"⚠️ Unexpected response format: {type(test_response).__name__}")
+                log_step(f"Unexpected response format: {type(test_response).__name__}", emoji="⚠️")
                 # Try to extract models from string representation as fallback
                 response_str = str(test_response)
                 if 'llama3.2-vision' in response_str:
                     available_models.append('llama3.2-vision:latest')
                 
         except Exception as model_parse_error:
-            print(f"⚠️ Error parsing models list: {model_parse_error}")
+            log_step(f"Error parsing models list: {model_parse_error}", emoji="⚠️")
             # Fallback: try to extract from string representation
             response_str = str(test_response)
             if 'llama3.2-vision' in response_str:
                 available_models.append('llama3.2-vision:latest')
         
-        print(f"📋 Available models: {available_models}")
+        log_step(f"Available models: {available_models}", emoji="📋")
         
         # Check for vision model with more flexible matching
         vision_model_found = any(
@@ -234,11 +243,11 @@ def run_ai_analysis(daily_fig, timeframe_fig, data: pd.DataFrame, ticker: str, p
         )
         
         if not vision_model_found:
-            print(f"⚠️ llama3.2-vision model not found. Available models: {available_models}")
-            print("📋 Skipping vision analysis - using AI agent analysis only")
+            log_step(f"llama3.2-vision model not found. Available models: {available_models}", emoji="⚠️")
+            log_step("Skipping vision analysis - using AI agent analysis only", emoji="📋")
             vision_response = {'message': {'content': 'Vision analysis skipped. The llama3.2-vision model is not installed. Please install it with: ollama pull llama3.2-vision'}}
         else:
-            print("✅ Vision model available")
+            log_step("Vision model available", emoji="✅")
             # Proceed with vision analysis
             
             # Suppress verbose Kaleido logging temporarily
@@ -251,6 +260,9 @@ def run_ai_analysis(daily_fig, timeframe_fig, data: pd.DataFrame, ticker: str, p
                 # Create a combined image with both charts vertically stacked
                 from PIL import Image
                 import numpy as np
+                
+                log_step("Preparing chart images for vision analysis...", emoji="🖼️")
+                image_prep_start = log_timer_start("Image Preparation")
                 
                 # Render both figures to images with optimized smaller sizes for faster processing
                 daily_buf = io.BytesIO()
@@ -284,30 +296,31 @@ def run_ai_analysis(daily_fig, timeframe_fig, data: pd.DataFrame, ticker: str, p
                 
                 # Check image size and aggressively optimize if needed
                 image_size = buf.getbuffer().nbytes
-                print(f"📊 Combined chart image size: {image_size / 1024:.1f} KB")
+                log_step(f"Combined chart image size: {image_size / 1024:.1f} KB", emoji="📊")
                 
                 if image_size > 300 * 1024:  # Reduced threshold from 500KB to 300KB
-                    print("🔧 Optimizing large image for faster processing...")
+                    log_step("Optimizing large image for faster processing...", emoji="🔧")
                     # More aggressive resizing
                     combined_img = combined_img.resize((int(combined_img.width * 0.6), int(combined_img.height * 0.6)))
                     buf = io.BytesIO()
                     combined_img.save(buf, format='PNG', optimize=True, quality=70)
                     buf.seek(0)
                     optimized_size = buf.getbuffer().nbytes
-                    print(f"✅ Optimized image size: {optimized_size / 1024:.1f} KB")
+                    log_step(f"Optimized image size: {optimized_size / 1024:.1f} KB", emoji="✅")
                 
                 image_data = base64.b64encode(buf.read()).decode('utf-8')
-                print("✅ Combined chart image prepared for AI vision analysis")
+                log_timer_end("Image Preparation", image_prep_start)
+                log_step("Combined chart image prepared for AI vision analysis", emoji="✅")
             except Exception as e:
-                print(f"❌ Error preparing chart: {e}")
+                log_step(f"Error preparing chart: {e}", emoji="❌")
                 return "Error in chart preparation", recommendation
             finally:
                 # Restore original logging level
                 kaleido_logger.setLevel(original_level)
                 
     except Exception as ollama_check_error:
-        print(f"❌ Ollama connection failed: {ollama_check_error}")
-        print("📋 Skipping vision analysis - Ollama service unavailable")
+        log_step(f"Ollama connection failed: {ollama_check_error}", emoji="❌")
+        log_step("Skipping vision analysis - Ollama service unavailable", emoji="📋")
         vision_response = {'message': {'content': 'Vision analysis unavailable. Ollama service is not running. Please start Ollama and ensure llama3.2-vision model is installed.'}}
         
     # Only proceed with vision analysis if Ollama and model are available AND vision is enabled
@@ -318,6 +331,7 @@ def run_ai_analysis(daily_fig, timeframe_fig, data: pd.DataFrame, ticker: str, p
         rsi = data['RSI'].iloc[-1] if 'RSI' in data.columns and len(data) > 0 else 50
         iv_rank = options_data.get('iv_data', dict()).get('iv_rank', 0) if options_data else 0
         
+        log_step("Creating structured vision prompt", emoji="✍️")
         structured_prompt = create_vision_prompt_template(
             ticker=ticker,
             timeframe="Daily/Intraday Combined",
@@ -334,12 +348,12 @@ def run_ai_analysis(daily_fig, timeframe_fig, data: pd.DataFrame, ticker: str, p
             'images': [image_data]
         }]
         
-        print("🔍 Processing with AI vision model...")
-        start_time = time.time()
+        log_step("Processing with AI vision model...", emoji="🔍")
+        vision_start_time = log_timer_start("Vision Analysis")
         
         try:
             # Use a simple, direct approach to avoid threading complexity and signal issues
-            print("🔄 Connecting to Ollama vision model...")
+            log_step("Connecting to Ollama vision model...", emoji="🔄")
             
             try:
                 # Attempt direct connection without complex threading
@@ -349,24 +363,24 @@ def run_ai_analysis(daily_fig, timeframe_fig, data: pd.DataFrame, ticker: str, p
                     stream=False
                 )
                 
-                duration = time.time() - start_time
-                print(f"✅ Vision analysis completed in {duration:.1f}s")
+                log_timer_end("Vision Analysis", vision_start_time)
                 
                 # Parse structured vision output
+                log_step("Parsing vision analysis output", emoji="🔎")
                 raw_vision_content = vision_response['message']['content']
                 structured_vision = parse_vision_analysis(raw_vision_content, current_price)
                 
                 # Add parsed vision analysis to recommendation for fusion
                 recommendation['vision_analysis'] = structured_vision
-                print(f"📊 Vision Analysis: {structured_vision.get('trend', 'neutral')} trend, "
-                      f"confidence {structured_vision.get('confidence', 0):.2f}")
+                log_step(f"Vision Analysis: {structured_vision.get('trend', 'neutral')} trend, "
+                      f"confidence {structured_vision.get('confidence', 0):.2f}", emoji="📊")
                 
             except Exception as e:
-                print(f"⚠️ Primary vision analysis failed: {e}")
+                log_step(f"Primary vision analysis failed: {e}", emoji="⚠️")
                 
                 # Try simplified fallback immediately
                 try:
-                    print("🔄 Attempting simplified analysis...")
+                    log_step("Attempting simplified analysis...", emoji="🔄")
                     simple_messages = [{
                         'role': 'user',
                         'content': f'Brief {ticker} chart trend analysis.',
@@ -379,11 +393,10 @@ def run_ai_analysis(daily_fig, timeframe_fig, data: pd.DataFrame, ticker: str, p
                         stream=False
                     )
                     
-                    duration = time.time() - start_time
-                    print(f"✅ Simplified vision analysis completed in {duration:.1f}s")
+                    log_timer_end("Vision Analysis (Simplified)", vision_start_time)
                     
                 except Exception as fallback_error:
-                    print(f"❌ All vision analysis attempts failed: {fallback_error}")
+                    log_step(f"All vision analysis attempts failed: {fallback_error}", emoji="❌")
                     vision_response = {
                         'message': {
                             'content': 'Vision analysis unavailable. Using AI agent analysis for trading insights.'
@@ -391,7 +404,7 @@ def run_ai_analysis(daily_fig, timeframe_fig, data: pd.DataFrame, ticker: str, p
                     }
                 
         except Exception as e:
-            print(f"❌ Error in vision analysis: {e}")
+            log_step(f"Error in vision analysis: {e}", emoji="❌")
             vision_response = {
                 'message': {
                     'content': 'Vision analysis failed due to connection issues. Using AI agent analysis for trading insights.'
@@ -400,10 +413,10 @@ def run_ai_analysis(daily_fig, timeframe_fig, data: pd.DataFrame, ticker: str, p
     else:
         # Vision analysis is disabled or unavailable
         if vision_timeout == 0:
-            print("📋 Vision analysis disabled by user - using AI agent analysis only")
+            log_step("Vision analysis disabled by user - using AI agent analysis only", emoji="📋")
             vision_response = {'message': {'content': 'Vision analysis disabled. Analysis based on quantitative indicators and AI agent recommendations above.'}}
         else:
-            print("📋 Vision analysis unavailable - using AI agent analysis only")
+            log_step("Vision analysis unavailable - using AI agent analysis only", emoji="📋")
             vision_response = {'message': {'content': 'Vision analysis unavailable. Analysis based on quantitative indicators and AI agent recommendations above.'}}
     
     # Helper function to format trade parameters in a more readable way
@@ -450,6 +463,7 @@ def run_ai_analysis(daily_fig, timeframe_fig, data: pd.DataFrame, ticker: str, p
         return '\n'.join(formatted_params)
     
     # Combine both analyses with enhanced vision output
+    log_step("Combining AI analysis results", emoji="🔄")
     vision_content = "Vision analysis unavailable"
     if 'vision_analysis' in recommendation:
         vision_analysis = recommendation['vision_analysis']
@@ -474,6 +488,7 @@ def run_ai_analysis(daily_fig, timeframe_fig, data: pd.DataFrame, ticker: str, p
         vision_content = "Vision analysis was not performed or failed"
     
     # Build the combined analysis
+    log_step("Generating final analysis report", emoji="📝")
     market_analysis = recommendation.get('market_analysis', {})
     strategy = recommendation.get('strategy', {})
     risk_assessment = recommendation.get('risk_assessment', {})
@@ -498,7 +513,7 @@ def run_ai_analysis(daily_fig, timeframe_fig, data: pd.DataFrame, ticker: str, p
         f"Always conduct your own research and risk assessment."
     )
     
-    print("\n" + "=" * 50)
-    print("🎯 AI ANALYSIS COMPLETED")
+    log_timer_end("AI Analysis", ai_start_time)
+    log_section_end(f"AI ANALYSIS FOR {ticker}")
     
     return combined_analysis, recommendation

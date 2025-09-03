@@ -1,3 +1,26 @@
+import pandas as pd
+def determine_trend(data: pd.DataFrame, window: int = 20) -> str:
+    """
+    Determine the trend direction ('uptrend', 'downtrend', 'sideways') based on closing prices.
+    Args:
+        data (pd.DataFrame): DataFrame with a 'Close' column
+        window (int): Number of periods to use for trend calculation
+    Returns:
+        str: 'uptrend', 'downtrend', or 'sideways'
+    """
+    if data is None or 'Close' not in data.columns or len(data) < window:
+        return 'sideways'
+    closes = data['Close'].tail(window)
+    x = range(len(closes))
+    # Simple linear regression slope
+    import numpy as np
+    slope = np.polyfit(x, closes, 1)[0]
+    if slope > 0.02:
+        return 'uptrend'
+    elif slope < -0.02:
+        return 'downtrend'
+    else:
+        return 'sideways'
 # =========================
 # Imports and Setup
 # =========================
