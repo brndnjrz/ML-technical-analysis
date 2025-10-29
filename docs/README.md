@@ -1,649 +1,299 @@
-### 🚀 **Latest Release Strategy Compliance, Schema Validation & Professional Reporting**
 
-This major update focuses on **implementing strict strategy compliance**, **robust schema validation**, **streamlining user experience**, **professional report formatting**, and **enhanced AI reliability** for institutional-quality trading analysis.
+# AI-Powered Technical Analysis Dashboard
 
-### 🎯 **Key Updates (August 2025):** Technical Stock Analysis Dashboard
-
-
-## **Overview**
-
-This project provides an **AI-powered technical stock analysis dashboard** built with Streamlit, Plotly, and advanced technical analysis tools. The dashboard features a modern, interactive UI, dynamic strategy and indicator selection, and AI-driven market analysis with PDF reporting.
-
-## 🚀 **Latest Release Strategy Compliance & Professional Reporting**
-
-This major update focuses on **implementing strict strategy compliance**, **streamlining user experience**, **professional report formatting**, and **enhanced AI reliability** for institutional-quality trading analysis.
-
-### 🎯 **Key Updates (August 2025):**
-
-#### 🎯 **Strategy Compliance & Standardization**
-
-- **6 Approved Strategies Only**: Complete restriction to approved trading strategies for compliance
-  - Covered Calls, Cash-Secured Puts, Iron Condors, Credit Spreads, Swing Trading, Day Trading Calls/Puts
-- **Timeframe-Specific Data**: Each strategy includes detailed configuration for Short-Term (1-7 days) and Medium-Term (1-3 weeks)
-- **AI Agent Compliance**: All AI agents (analyst, strategy, execution, hedge fund) updated to use only approved strategies
-- **Strategy Database Rebuild**: Complete `trading_strategies.py` restructure with professional-grade strategy definitions
-- **Cross-Reference Cleanup**: Removed all unauthorized strategy references across the entire codebase
-
-#### 🎨 **Professional Report Formatting**
-
-- **Institutional-Style Reports**: New `format_professional_report()` function with clean, institutional-quality formatting
-- **Structured Trade Signals**: Clean markdown format with professional sections (Market Overview, Technical Levels, Trade Parameters)
-- **Enhanced Readability**: Replaced messy JSON outputs with formatted bullet points and clear metrics
-- **Educational Compliance**: Added professional disclaimers and risk warnings
-- **PDF Integration**: Professional formatting integrated into both UI display and PDF generation
-
-#### 📱 **Simplified User Interface**
-
-- **Streamlined Timeframe Selection**: Reduced from 3 to 2 options (Short-Term 1-7 days, Medium-Term 1-3 weeks)
-- **AI-Driven Strategy Selection**: Removed manual strategy selection in favor of intelligent AI decision-making
-- **Clean Sidebar Design**: Simplified configuration with clear strategy explanations
-- **Enhanced User Guidance**: Added informational tooltips and strategy descriptions
-
-#### ⚙️ **Core Application Improvements**
-
-- **Session State Management**: Fixed state persistence issues with analysis results and UI components
-- **Error Resilience**: Comprehensive handling of connection timeouts when fetching fundamental data
-- **Type Safety**: Enhanced type checking and validation for critical data structures
-- **Tab-Based Interface**: Improved organization with dedicated tabs for different analysis types
-- **PDF Report Enhancements**: Fixed report generation errors and improved formatting consistency
-- **Schema Validation System**: New JSON schema validation ensuring consistent AI outputs
-- **Data Adaptation Framework**: Intelligent transformation of non-conforming data structures
-
-#### 📊 **Data Handling & API Resilience**
-
-- **Fundamental Data Optimization**: Reduced timeout issues with Yahoo Finance API through fast_info implementation
-- **Fallback Systems**: Graceful degradation when external data sources are unavailable
-- **Data Type Validation**: Comprehensive checking to prevent "object has no attribute" errors
-- **Default Values**: Intelligent fallbacks when specific data points are unavailable
-- **Error Recovery**: Automatic retry and alternative data source mechanisms
-
-#### 🧠 **AI Analysis Enhancements**
-
-- **Strategy Compliance System**: All AI agents now strictly use only the 6 approved trading strategies
-- **Comprehensive Strike Selection Algorithm**: Integrated approach combining statistical, technical, and probability methods
-- **Weighted Strike Analysis**: Strategy-specific weighting of different strike selection methods based on market conditions
-- **Advanced Options Strategy Customization**: Enhanced parameter tuning for optimal trade setups
-- **Support/Resistance Integration**: Better utilization of key price levels in options strategy development
-- **Dynamic Strike Rounding**: Intelligent rounding based on price levels for more practical selections
-
-#### ⚙️ **System Architecture Improvements**
-
-- **Strategy Database Compliance**: Complete rebuild of `trading_strategies.py` with approved strategies only
-- **Modular Component Design**: Enhanced separation of concerns with dedicated UI components
-- **Consistent State Management**: Improved session state handling across application components
-- **Error Propagation**: Better error messages and feedback throughout the application stack
-- **Cross-Reference Validation**: Systematic removal of unauthorized strategy references
-- **Configuration Centralization**: Enhanced use of central configuration for application settings
-
-### 📊 **Trading Analysis Improvements**
-
-- **Professional Report Generation**: New institutional-style trade signal reports with clean formatting
-- **Multi-Method Strike Selection**: Combines statistical, technical, and delta-based approaches for optimal strike choices
-- **Enhanced Strategy Specificity**: More targeted recommendations based on exact market conditions and approved strategies
-- **Defensive Programming**: Robust data handling ensuring analysis completes even with partial data
-- **Intelligent Fallbacks**: Graceful degradation when specific data points are unavailable
-- **Type-Safe Display**: Improved formatting for numeric vs string data in charts and tables
-
-### 🔄 **Core AI System - Strategy Compliant**
-
-The following foundational features provide the backbone of the analysis system with strict strategy compliance:
-
-#### 🤖 **Multi-Agent AI System** (Enhanced with Strategy Compliance)
-
-- **Complete AI Architecture**: Specialized agent system with four distinct components using only approved strategies
-- **Four Specialized Agents** (All Strategy Compliant):
-  - `AnalystAgent`: Deep technical and fundamental analysis limited to approved strategy frameworks
-  - `StrategyAgent`: Advanced trading strategy development using only the 6 approved strategies
-  - `ExecutionAgent`: Precise entry/exit points and position sizing for compliant strategies only
-  - `BacktestAgent`: Historical performance validation for approved strategies and market condition compatibility
-- **HedgeFundAI Orchestrator**: Central coordination system ensuring all agent recommendations use approved strategies only
-
-#### 🎯 **6 Approved Trading Strategies**
-
-The system now exclusively uses these professionally validated strategies:
-
-1. **Covered Calls** - Income generation with defined risk management
-2. **Cash-Secured Puts** - Conservative income with equity acquisition potential
-3. **Iron Condors** - Neutral strategies for range-bound markets
-4. **Credit Spreads** - Directional strategies with defined risk/reward
-5. **Swing Trading** - Multi-day position trading with technical analysis
-6. **Day Trading Calls/Puts** - Short-term directional options trading
-
-Each strategy includes comprehensive timeframe-specific configurations for both Short-Term (1-7 days) and Medium-Term (1-3 weeks) approaches.
-
-#### 🔮 **Enhanced Machine Learning Predictions** (Maintained)
-
-- **Ensemble Model Approach**: Automatic combination of RandomForest, XGBoost, and CatBoost for better predictions
-- **Advanced Feature Engineering**: Strategy-specific feature combinations for different trading approaches
-- **Robust Error Handling**: Fixed NoneType arithmetic operations and pandas future warnings
-- **Data Validation**: Comprehensive validation with minimum data requirements (20+ rows)
-- **Confidence Scoring**: Real-time prediction confidence metrics with contextual AI analysis
+**Executive Summary:**
+This dashboard is a modular, production-grade Streamlit app for stock and options analysis. It combines multi-agent AI, robust data engineering, and professional reporting to deliver actionable, compliance-aware insights for traders, analysts, and educators.
 
 ---
 
-#### 🤖 **Multi-Agent AI System**
+## Table of contents
 
-- **Complete AI Architecture Overhaul**: Replaced single AI analysis with specialized agent system
-- **Four Specialized Agents**:
-  - `AnalystAgent`: Deep technical and fundamental analysis with multi-timeframe integration
-  - `StrategyAgent`: Advanced trading strategy development and optimization
-  - `ExecutionAgent`: Precise entry/exit points and position sizing calculations
-  - `BacktestAgent`: Historical performance validation and market condition compatibility
-- **HedgeFundAI Orchestrator**: Central coordination system for agent collaboration and comprehensive market analysis
+- [AI-Powered Technical Analysis Dashboard](#ai-powered-technical-analysis-dashboard)
+  - [Table of contents](#table-of-contents)
+- [What it is](#what-it-is)
+- [Key Features](#key-features)
+- [Quick Start](#quick-start)
+    - [Libraries Used](#libraries-used)
+    - [Model Overview (AI Prediction Models)](#model-overview-ai-prediction-models)
+  - [Setup Environment Using Anaconda](#setup-environment-using-anaconda)
+    - [Download and install Anaconda](#download-and-install-anaconda)
+  - [How to run Dashboard](#how-to-run-dashboard)
+- [How to Use](#how-to-use)
+- [Architecture \& Workflow (Summary)](#architecture--workflow-summary)
+- [Project Structure (High Level)](#project-structure-high-level)
+- [Extensibility \& Customization](#extensibility--customization)
+- [Schema \& Validation](#schema--validation)
+- [Testing \& Reliability](#testing--reliability)
+- [Disclaimer \& License](#disclaimer--license)
+  - [Appendix: Helpful Commands](#appendix-helpful-commands)
 
-#### 🔮 **Enhanced Machine Learning Predictions**
+---
 
-- **Ensemble Model Approach**: Automatic combination of RandomForest, XGBoost, and CatBoost for better predictions
-- **Advanced Feature Engineering**: Strategy-specific feature combinations for different trading approaches
-- **Robust Error Handling**: Fixed NoneType arithmetic operations and pandas future warnings
-- **Data Validation**: Comprehensive validation with minimum data requirements (20+ rows)
-- **Confidence Scoring**: Real-time prediction confidence metrics with contextual AI analysis
+✅ **Change Summary:**
 
-#### 🖥️ **Streamlit UI/UX Improvements**
+* Added new entries:
 
-- **Enhanced Progress Indicators**: Beautiful progress bars with emoji formatting for AI analysis
-- **Better Console Logging**: Structured output with clear progress tracking
-- **Improved Error Messages**: User-friendly error handling with detailed feedback
-- **Threading Compatibility**: Fixed "signal only works in main thread" errors for Streamlit compatibility
-- **Real-time Status Updates**: Live feedback during analysis operations
+  * `Libraries Used`
+  * `Setup Environment Using Anaconda (optional)`
+  * `Download and install Anaconda`
+  * `How to Use the Dashboard`
+* Preserved all indentation and link anchors so clicking each heading in GitHub or VSCode will jump directly to that section.
 
-#### 🔧 **Technical Infrastructure Enhancements**
-
-- **Ollama Integration**: Complete vision model integration with timeout handling
-- **Threading System**: Robust timeout mechanisms using threading + queue for cross-platform compatibility
-- **Model Detection**: Flexible Ollama response parsing for ListResponse objects
-- **Memory Management**: Automatic temporary file cleanup and resource management
-- **Error Recovery**: Comprehensive fallback chains for API failures
-
-#### 📊 **Enhanced PDF Report Generation & Professional Formatting**
-
-- **Institutional-Style Reports**: Professional-grade formatting with clean, structured layout
-- **Professional Trade Signal Format**: New `format_professional_report()` function with institutional-quality presentation
-- **Comprehensive Sections**: Market Overview, Technical Levels, Trade Parameters, Risk Assessment with clear formatting
-- **Enhanced Readability**: Replaced messy JSON outputs with structured bullet points and professional metrics
-- **Multi-timeframe Analysis Integration**: Seamless presentation of different timeframe analyses
-- **Automatic Chart Integration**: Smart chart sizing and integration with cleanup procedures
-- **Unicode and Emoji Support**: Comprehensive character replacement for PDF compatibility
-- **Educational Disclaimers**: Professional risk warnings and compliance statements
-- **Interactive PDF Preview**: In-dashboard preview capabilities with one-click download
-- **Complete Analysis Export**: Support for all technical indicators, AI insights, and strategy recommendations
-
-#### 🐛 **Critical Bug Fixes**
-
-- **Vision Analysis Timeout Issues**: Resolved frequent 60-second timeouts with configurable timeout settings and optimized image processing
-- **PDF Unicode Encoding**: Fixed `'latin-1' codec can't encode character '\u2022'` errors with comprehensive character replacement
-- **Trade Parameter Formatting**: Eliminated raw JSON display in favor of professional formatting in both PDF and UI
-- **Ollama Connection Reliability**: Enhanced connection handling with pre-warming and health checks
-- **Resource Management**: Improved temporary file cleanup and memory management during analysis
-- **Cross-Platform Threading**: Enhanced timeout mechanisms using queue-based systems for better Streamlit compatibility
-
-#### 🐛 **Previous Critical Bug Fixes**
-
-- **Threading Compatibility**: Resolved "signal only works in main thread" error in Streamlit
-- **NoneType Arithmetic**: Fixed "unsupported operand type(s) for -: 'float' and 'NoneType'" in predictions
-- **Pandas Warnings**: Eliminated FutureWarning issues with proper DataFrame indexing
-- **Ollama Integration**: Fixed model detection with flexible ListResponse parsing
-- **Memory Leaks**: Implemented proper resource cleanup and temporary file management
+Would you like me to also add a **“Model Overview (AI Prediction Models)”** section right after “Libraries Used” to document the purpose and differences between Random Forest, XGBoost, and CatBoost? It fits nicely there.
 
 ---
 
 
+# What it is
 
----
-
-## 📋 **Schema Validation System**
-
-The application implements a robust JSON schema validation system to ensure consistent AI model outputs and reliable data processing:
-
-### 🔒 **AI Model Output Schema**
-
-- **Comprehensive Schema Definition**: Detailed JSON schema enforcing consistent structure for AI outputs
-- **Type Validation**: Intelligent validation allowing both strict types and null values where appropriate
-- **Required Fields**: Strict enforcement of critical fields while providing flexibility for optional data
-- **Nested Structure**: Support for complex nested objects including strategy recommendations and market analysis
-- **Field Documentation**: Descriptive comments for each field to ensure proper usage
-
-### 🔄 **Data Adaptation Framework**
-
-- **Structure Transformation**: Intelligent adaptation between flat and nested data structures
-- **Default Values**: Automatic fallback to sensible defaults when fields are missing
-- **Type Coercion**: Smart handling of type inconsistencies for numeric fields
-- **Error Recovery**: Graceful handling of schema validation errors with informative messages
-- **Flexible Processing**: Support for both strict and lenient validation depending on context
-
-### 🛠️ **Implementation Details**
-
-- **Schema Definition**: Central schema definition in `src/utils/ai_output_schema.py`
-- **Validation Functions**: Comprehensive validation utilities with detailed error reporting
-- **Integration Points**: Seamless integration with AI analysis pipeline and strategy processing
-- **Adaptation Layer**: Intelligent transformation of non-conforming data into validated schema
-- **Error Handling**: Graceful fallback mechanisms when validation fails
-
-### 📊 **Benefits**
-
-- **Reliability**: Eliminates unexpected structure or type errors in AI responses
-- **Consistency**: Ensures uniform data structure across different application components
-- **Documentation**: Self-documenting data contracts through schema definitions
-- **Flexibility**: Supports adaptation of various data formats to expected schema
-- **Error Prevention**: Catches data inconsistencies early in the processing pipeline
-
----
-
-### **Libraries Used**
-
-- `streamlit`: For the interactive web dashboard
-- `yfinance`: For downloading historical stock and fundamental data
-- `pandas`: For data manipulation and time series
-- `plotly`: For interactive candlestick and technical indicator charts
-- `ollama`: For sending chart images and prompts to an AI model (LLaMA 3.2 Vision)
-- `scikit-learn`: For price prediction using RandomForestRegressor
-- `xgboost`: For XGBoost regression model
-- `catboost`: For CatBoost regression model
-- `tempfile`, `base64`, `os`: For temporary file management and PDF/chart handling
+* Interactive technical charting (Plotly)
+* Multi-agent AI analysis (Analyst, Strategy, Execution, Backtest) orchestrated by HedgeFundAI
+* Options strategy generation (restricted to 6 approved, compliant strategies)
+* Institutional-style reports exportable to PDF
+* Robust error handling and schema validation for reliability
 
 ---
 
 
+# Key Features
 
-
-## **Project Structure**
-
-```
-├── app.py                     # Main Streamlit dashboard with professional report formatting
-├── src/
-│   ├── trading_strategies.py # 🆕 REBUILT: 6 approved strategies with timeframe-specific data
-│   ├── data_loader.py        # Data fetching utilities
-│   ├── indicators.py         # Technical indicator calculations  
-│   ├── plotter.py           # Charting utilities
-│   ├── ai_analysis.py       # AI prompt and analysis logic with professional formatting
-│   ├── ai_agents/
-│   │   ├── __init__.py      # Agent system initialization
-│   │   ├── analyst.py       # 🔄 UPDATED: Strategy-compliant technical analysis
-│   │   ├── strategy.py      # 🔄 UPDATED: Enhanced strike selection with approved strategies
-│   │   ├── execution.py     # 🔄 UPDATED: Compliant trade execution
-│   │   ├── hedge_fund.py    # 🔄 UPDATED: Strategy-compliant AI orchestrator
-│   │   └── backtest.py      # 🔄 UPDATED: Approved strategy validation
-│   ├── pdf_generator.py     # 🔄 UPDATED: Professional report formatting integration
-│   ├── pdf_utils.py         # PDF utilities and display
-│   ├── data_pipeline.py     # Data processing pipeline
-│   ├── prediction.py        # ML models and feature engineering
-│   ├── ui_components/       # 🆕 Enhanced modular UI components
-│   │   ├── __init__.py      # Component initialization
-│   │   ├── options_analyzer.py # Options analysis component
-│   │   ├── options_strategy_selector.py # 🔄 UPDATED: 6 approved strategies only
-│   │   ├── sidebar_config.py # 🔄 UPDATED: Simplified to 2 timeframe options
-│   │   └── sidebar_indicators.py # Indicator selection component
-│   ├── config.py           # Configuration settings
-│   ├── logging_config.py    # Centralized logging configuration
-│   ├── temp_manager.py      # Temporary file management
-│   └── trading_strategies.py # 🆕 COMPLETE REBUILD: Professional strategy database
-```
-
-## 📋 **Key File Changes Summary**
-
-### **🆕 New Features**
-
-- **`app.py`**: Added `format_professional_report()` function (124 lines) for institutional-style reports
-- **Professional Report Template**: Clean markdown structure with Market Overview, Technical Levels, Trade Parameters sections
-- **Strategy Compliance Validation**: Cross-file validation ensuring only approved strategies are used
-- **`src/utils/ai_output_schema.py`**: New schema validation system ensuring consistent AI outputs
-
-### **🔄 Major Updates**
-
-- **`src/trading_strategies.py`**: Complete rebuild with 6 approved strategies and timeframe-specific configurations
-- **`src/ui_components/sidebar_config.py`**: Simplified from 3 to 2 timeframe options with AI-driven strategy selection
-- **All AI Agents**: Updated for strict strategy compliance (analyst.py, strategy.py, execution.py, hedge_fund.py, backtest.py)
-- **`src/pdf_generator.py`**: Enhanced to use professional report formatting
-- **`src/ai_analysis.py`**: Improved formatting functions and professional display integration
-
-### **🧹 Code Quality Improvements**
-
-- **Cross-Reference Cleanup**: Removed all unauthorized strategy references across 8+ files
-- **Error Handling**: Enhanced error resilience and graceful fallbacks
-- **Professional Formatting**: Consistent institutional-style presentation throughout
-- **Educational Compliance**: Added professional disclaimers and risk warnings
-- **Schema Validation**: Comprehensive JSON schema validation with detailed error reporting
-
-## 📈 **Performance & Reliability Improvements**
-
-### **🚀 Performance Enhancements**
-
-- **Faster Analysis**: Optimized agent workflow reducing processing time by ~40%
-- **Better Memory Usage**: Improved data handling and cleanup procedures
-- **Enhanced Caching**: Smart caching for repeated calculations
-- **Parallel Processing**: Agent system allows for concurrent analysis tasks
-
-### **🛡️ Reliability & Error Handling**
-
-- **Comprehensive Exception Handling**: Graceful degradation for network/API failures
-- **Data Validation**: Robust input validation preventing calculation errors
-- **Cross-Platform Compatibility**: Threading-based solutions for macOS/Windows/Linux
-- **Resource Management**: Automatic cleanup preventing memory leaks
-
----
----
-
-## 📅 **Version History & Changelog**
-
-### **Strategy Compliance & Professional Reporting (August 2025)**
-
-#### **🎯 Major Features**
-
-- **Strategy Compliance System**: Implemented strict adherence to 6 approved trading strategies
-- **Professional Report Formatting**: New institutional-style trade signal reports with clean structure
-- **Simplified UI**: Streamlined timeframe selection from 3 to 2 options for better user experience
-- **AI-Driven Strategy Selection**: Automated optimal strategy selection replacing manual configuration
-- **Schema Validation System**: Robust JSON schema validation for consistent AI outputs
-
-#### **🔧 Technical Improvements**
-
-- **Complete Strategy Database Rebuild**: `trading_strategies.py` reconstructed with approved strategies only
-- **Multi-Agent Compliance**: All AI agents updated to use approved strategies exclusively
-- **Professional Formatting Integration**: Enhanced PDF and UI display with institutional-quality presentation
-- **Cross-Reference Validation**: Systematic cleanup of unauthorized strategy references across codebase
-- **Enhanced Strike Selection**: Comprehensive algorithm combining statistical, technical, and delta-based approaches
-- **Data Adaptation Framework**: Intelligent transformation of non-conforming data structures
-
-#### **📊 User Experience Enhancements**
-
-- **Clean Report Layout**: Professional sections (Market Overview, Technical Levels, Trade Parameters, Risk Assessment)
-- **Educational Compliance**: Added professional disclaimers and risk warnings
-- **Improved Readability**: Replaced messy JSON outputs with structured bullet points
-- **Strategy Explanations**: Clear tooltips and descriptions for each approved strategy
-
-#### **🛠️ Code Quality**
-
-- **Error Resilience**: Enhanced error handling and graceful fallbacks
-- **Type Safety**: Improved data validation and formatting consistency  
-- **Resource Management**: Better temporary file cleanup and memory management
-- **Testing Coverage**: Comprehensive validation of all new features and compliance systems
-
-### **v2.0+ - Enhanced Options Analysis & UX Improvements**
-
-- Vision analysis timeout resolution and user control settings
-- PDF Unicode encoding fixes and professional formatting
-- Enhanced options trading intelligence with comprehensive strike selection
-- Multi-agent AI system improvements and error handling
-- Cross-platform compatibility and threading optimizations
-
-### **v1.0 - Foundation Release**
-
-- Core Streamlit dashboard with technical analysis capabilities
-- Basic AI integration with Ollama vision models
-- PDF report generation and charting functionality
-- Multi-timeframe analysis and indicator selection
+- **Strategy Compliance:** Only 6 approved strategies (Covered Calls, Cash-Secured Puts, Iron Condors, Credit Spreads, Swing Trading, Day Trading Calls/Puts) with timeframe-specific configuration.
+- **Multi-Agent AI System:** Analyst, Strategy, Execution, Backtest agents coordinated by HedgeFundAI.
+- **Professional Reporting:** Institutional-style markdown and PDF output, schema validation, and fallback logic.
+- **Streamlined UX:** Sidebar configuration, tabbed interface, progress/status reporting, tooltips, and contextual help.
+- **Robust Data Pipeline:** Market and options ingestion, technical indicators, support/resistance detection, error resilience.
+- **Extensible & Modular:** Easily add new indicators, strategies, or AI models.
 
 ---
 
-## 📝 **Pull Request & Commit Information**
+---
 
-### **Recommended Pull Request Title**
+# Quick Start
 
-```text
-feat: Implement Strategy Compliance & Professional Reporting (v3.0)
-```
+1. **Create virtual environment (recommended):**
 
-### **Recommended Commit Messages**
+  ```bash
+  python -m venv .venv
+  source .venv/bin/activate   # mac/linux
+  .venv\Scripts\activate      # windows
+  ```
+2. **Install dependencies:**
 
-```bash
-# Main implementation commit
-feat: Add strategy compliance system with 6 approved strategies
+  ```bash
+  pip install -r requirements.txt
+  # or
+  pip3 install streamlit plotly ollama pandas pandas_ta fpdf kaleido yfinance scikit-learn xgboost catboost
+  ```
+3. **(Optional) Run Ollama vision model:**
 
-# UI improvements commit  
-feat: Simplify timeframe selection and add professional report formatting
+  ```bash
+  ollama run llama3.2-vision
+  ```
+  * Keep the Ollama terminal running while using the dashboard if you enable vision analysis.
+4. **Start the dashboard:**
 
-# AI agent updates commit
-refactor: Update all AI agents for strategy compliance
+  ```bash
+  streamlit run app.py
+  ```
+---
 
-# Code quality commit
-refactor: Clean up unauthorized strategy references and enhance error handling
-
-# Schema validation commit
-feat: Add JSON schema validation system for AI outputs
-```
-
-### **Pull Request Description**
-
-This major update implements comprehensive strategy compliance and professional reporting capabilities:
-
-#### Strategy Compliance (🎯 Primary Focus)
-
-- Restricts system to 6 approved trading strategies for institutional compliance
-- Rebuilds strategy database with timeframe-specific configurations
-- Updates all AI agents to use approved strategies exclusively
-
-#### Professional Reporting (📊 Secondary Focus)
-
-- Implements institutional-style trade signal reports with clean formatting
-- Replaces messy JSON outputs with structured professional sections
-- Integrates educational disclaimers and risk warnings
-
-#### User Experience (💡 Tertiary Focus)
-
-- Simplifies timeframe selection from 3 to 2 options
-- Enables AI-driven strategy selection for optimal decision making
-- Enhances UI with clear strategy explanations and tooltips
-
-#### Technical Quality (🔧 Foundation)
-
-- Comprehensive error handling and validation systems
-- Enhanced strike selection algorithm with multiple methodologies
-- Cross-reference cleanup ensuring complete strategy compliance
-- Schema validation ensuring consistent AI model outputs
 
 ---
 
-## **What the Code Does**
+### Libraries Used
 
-### **1. Streamlit App Setup & UI**
+- `streamlit`: Interactive dashboard
+- `yfinance`: Stock/fundamental data
+- `pandas`: Data manipulation
+- `plotly`: Charting
+- `ollama`: Vision AI model integration
+- `scikit-learn`, `xgboost`, `catboost`: ML models for price prediction
+- `tempfile`, `base64`, `os`: File/PDF/chart handling
 
-- Modern, wide-layout dashboard with streamlined controls
-- Sidebar features intelligent configuration options with AI-driven defaults
-- Real-time data fetching enabled by default
-- Dynamic indicator selection based on strategy type
+---
 
-### **2. Inputs for Stock Ticker, Date Range, and Strategy**
+### Model Overview (AI Prediction Models)
 
-- Enter a stock ticker (e.g., "AAPL")
-- Choose start and end dates for historical data
-- Select ML model type (RandomForest, XGBoost, CatBoost)
-- Select timeframe and analysis type
-- Choose strategy type and specific options strategy if applicable
+- **Random Forest:** Fast, robust for tabular data, good baseline for price prediction.
+- **XGBoost:** Gradient boosting, handles complex relationships, often best for accuracy.
+- **CatBoost:** Handles categorical features natively, strong for financial time series.
+- **Ensemble:** The app combines these for improved prediction reliability and confidence scoring.
 
-### **3. Fetch and Display Stock Data**
+---
 
-- Stock data is fetched using `yfinance` for the selected ticker, date range, and interval.
-- Data is stored in `st.session_state` for persistence and fast UI updates.
-
-
-
-
-
-### **4. Technical & Fundamental Metrics, Charting**
-
-- Interactive candlestick charts are created with Plotly.
-- Sidebar allows dynamic selection of technical indicators, grouped by category (momentum, trend, volatility, volume, oscillators).
-- Recommended indicators are pre-selected based on chosen strategy.
-- Indicators include: SMA, EMA, RSI, MACD, Bollinger Bands, VWAP, ATR, ADX, Stochastic, OBV, and more.
-- **Fundamental metrics** (EPS, P/E Ratio, Revenue Growth, Profit Margin) are fetched via yfinance and combined with technicals in the dashboard and for AI analysis.
-
-
-
-
-
-### **5. AI-Powered Analysis & Price Prediction**
-
-- Advanced feature engineering for ML models
-- Multiple model options with optimized configurations
-- Automatic handling of missing values and data cleaning
-- Real-time prediction confidence scoring
-- Contextual AI analysis based on prediction results
-
-### **6. Multi-Agent AI System (Strategy Compliant)**
-
-- **AnalystAgent (Strategy Compliant):**
-  - Performs deep technical and fundamental analysis using approved strategy frameworks
-  - Integrates multiple timeframe data with strategy compliance validation
-  - Identifies key market patterns and trends within approved strategy parameters
-- **StrategyAgent (6 Approved Strategies Only):**
-  - Develops customized trading strategies using only approved methods
-  - Optimizes strategy parameters within compliance boundaries
-  - Provides risk-adjusted recommendations from approved strategy database
-  - Comprehensive strike selection using statistical, technical, and delta-based approaches
-- **ExecutionAgent (Compliant Trade Execution):**
-  - Determines optimal entry/exit points for approved strategies only
-  - Calculates position sizing within approved risk parameters
-  - Manages risk parameters according to strategy-specific guidelines
-- **BacktestAgent (Approved Strategy Validation):**
-  - Validates strategies on historical data using approved methods only
-  - Provides performance metrics for compliant strategies
-  - Identifies market condition compatibility within approved frameworks
-
-### **7. Professional Report Generation & Analysis Display**
-
-- **Institutional-Style Trade Signals**: Clean, professional report format replacing messy outputs
-- **Structured Analysis Sections**: Market Overview, Technical Levels, Trade Parameters, Risk Assessment
-- **Professional Formatting**: Enhanced readability with structured bullet points and clear metrics
-- **Strategy Compliance Integration**: All reports use only approved strategies and parameters
-- **Educational Compliance**: Professional disclaimers and risk warnings included
-- **PDF Integration**: Professional formatting carries through to PDF generation
-- **Real-time Analysis Display**: Clean presentation in dashboard with professional styling
-- **Interactive Elements**: Enhanced UI components with clear strategy explanations
-
-
-
-
-
-### **6. Temporary File & State Management**
-
-- Temporary files for charts and PDFs are managed and cleaned up automatically.
-- All user selections and results are managed via Streamlit session state for a seamless experience.
-- Modular session state keys for stock data, levels, options data, and active indicators.
-
-
-
-
-
-## **Modularization & Maintainability**
-
-- All major logic is separated into modules in `src/` for easy maintenance and extension.
-- UI components (sidebar, quick stats) are reusable and easy to update.
-- Data pipeline and prediction logic are decoupled from the main app for clarity.
-
-## **Use Cases**
-
-1. **Stock Trading and Investment:**
-   - Analyze historical and real-time stock data with advanced technical indicators and AI-driven insights.
-2. **Options Strategy Planning:**
-   - Select and evaluate options strategies (Iron Condor, Covered Calls, etc.) with AI recommendations.
-3. **Educational Tool:**
-   - Teach technical analysis, charting, and options strategies interactively.
-4. **AI-Assisted Decision Making:**
-   - Use LLaMA 3.2 Vision to get actionable, explainable trade recommendations.
-5. **Professional Reporting:**
-   - Generate and download comprehensive PDF reports for research or sharing.
-
-
-## **Setup Environment Using Anaconda (optional)**
+## Setup Environment Using Anaconda
 
 ### Download and install [Anaconda](https://www.anaconda.com/download)
 
-1. Create an environment
+1. **Create an environment**
 
    ```bash
    conda create --name <ENV_NAME>
    ```
 
-2. To activate this environment
+2. **Activate the environment**
 
    ```bash
    conda activate <ENV_NAME>
    ```
 
-3. To run the app in this environment
+3. **Navigate to your project**
 
    ```bash
    cd <PATH_TO_YOUR_PROJECT>
    ```
 
-   - Then follow steps in [How to Use the Dashboard](#how-to-use-the-dashboard)
+   * Then follow the steps in [How to Use the Dashboard](#how-to-use-the-dashboard)
 
-4. To deactivate an active environment
+4. **Deactivate the environment**
 
    ```bash
    conda deactivate <ENV_NAME>
    ```
 
+---
 
+## How to run Dashboard
 
-## **How to Use the Dashboard**
+1. **Download and install [Ollama](https://ollama.com/)**
 
-1. Download and install [Ollama](https://ollama.com/)
-   - In a terminal, run:
+   * In a terminal, run:
+
      ```bash
      ollama run llama3.2-vision
      ```
-   - Keep this terminal open while using the dashboard.
-2. In a new terminal, install the required libraries:
+   * Keep this terminal open while using the dashboard.
+
+2. **Install required libraries**
+
    ```bash
    pip3 install streamlit plotly ollama pandas pandas_ta fpdf kaleido yfinance scikit-learn xgboost catboost
    ```
-3. Run the app:
+
+3. **Run the app**
+
    ```bash
    streamlit run app.py
    ```
-4. Use the dashboard:
-   - Enter a stock ticker (e.g., AAPL)
-   - Select date range, timeframe, and analysis type
-   - Choose or accept recommended indicators
-   - Select options strategies if desired
-   - Click "🔄 Fetch & Analyze Data" to load data and charts
-   - Click "Run Analysis 💸" for AI-powered recommendations
-   - Generate and download PDF reports as needed
 
+4. **Use the dashboard**
 
-## 🧪 **Testing & Development Status**
-
-### **✅ Latest Validations (Strategy Compliance & Professional Formatting)**
-
-- **Strategy Compliance System**: Complete validation of 6 approved strategies across all AI agents
-- **Professional Report Formatting**: Institutional-style reports tested and validated with clean markdown structure
-- **Timeframe Simplification**: UI streamlined to 2 timeframe options with full functionality validation
-- **Cross-Reference Cleanup**: Systematic validation ensuring no unauthorized strategy references
-- **PDF Professional Integration**: Enhanced PDF generation with professional formatting tested and working
-- **Strategy Database Integrity**: Complete `trading_strategies.py` validation with timeframe-specific configurations
-
-### **✅ Previous Validations (v2.0+)**
-
-- **Vision Analysis Timeout Resolution**: Comprehensive testing with configurable timeouts (30-300 seconds)
-- **PDF Unicode Encoding**: All character encoding issues resolved with ASCII conversion
-- **Trade Parameter Formatting**: Clean display formatting validated in both PDF and UI
-- **Ollama Connection Stability**: Enhanced error handling and connection warming tested
-- **User Control Settings**: Vision analysis toggle and timeout controls fully functional
-- **Cross-Platform Compatibility**: Threading and timeout systems validated on macOS/Windows/Linux
-- **Multi-agent Workflow**: Comprehensive error handling and strategy compliance verified
-- **Prediction System**: Error handling confirmed and tested with ensemble methods
-
-### **🔄 Recent Development Focus**
-
-- **Strategy Compliance Priority**: Ensuring all components use only approved trading strategies
-- **Professional User Experience**: Institutional-quality reports and clean, readable formatting
-- **Simplified Decision Making**: AI-driven strategy selection reducing user complexity
-- **Educational Compliance**: Professional disclaimers and risk assessment integration
-- **Quality Assurance**: Comprehensive testing of formatting, compliance, and user interface improvements
+   * Enter a stock ticker (e.g., `AAPL`)
+   * Select date range, timeframe, and analysis type
+   * Click **“🔄 Fetch & Analyze Data”** to load data and charts
+   * Click **“Run Analysis 💸”** for AI-powered recommendations
+   * Generate and download **PDF reports** as needed
 
 ---
 
-## **Disclaimer**
 
-### For Educational Purposes Only
+# How to Use
 
-- This dashboard does not constitute financial or investing advice.
+- Enter a ticker (e.g., `AAPL`) in the sidebar
+- Select date range, timeframe, and analysis type
+- Click **Fetch & Analyze Data** to load data and charts
+- Click **Run Analysis** for AI-powered recommendations
+- Download PDF reports as needed
 
-### AI/LLM Technology is Experimental
+**Notes:**
+- Strategy selection is AI-driven and always compliant
+- Indicators are grouped and pre-selected by strategy type
 
-- Outputs may contain inaccuracies or misleading information.
+---
 
-### Use Critical Thinking
 
-- Always verify conclusions and make informed decisions.
+# Architecture & Workflow (Summary)
+
+- **Main Entry:** `app.py` orchestrates UI, session state, and workflow
+- **Modular Design:** `src/` contains submodules for analysis, agents, plotting, UI, and utilities
+- **Session State:** Streamlit session state persists user selections, data, and results
+- **Workflow:**
+  1. User configures analysis in the sidebar
+  2. Clicks "Fetch & Analyze Data" to load and process data
+  3. Technical analysis and charts are shown in Tab 1
+  4. AI analysis and trade recommendations in Tab 2
+  5. Options analysis and strategy optimization as needed
+  6. Export professional reports or view quick stats in the sidebar
+
+---
+
+
+# Project Structure (High Level)
+
+```
+├── app.py
+├── requirements.txt
+├── src/
+│   ├── trading_strategies.py      # Approved strategies + timeframe configs
+│   ├── data_loader.py             # Market & options ingestion
+│   ├── indicators.py              # Indicator generation
+│   ├── plotter.py                 # Chart utilities
+│   ├── ai_analysis.py             # AI prompt/formatting
+│   ├── ai_agents/                 # Analyst, strategy, execution, backtest, hedge_fund
+│   ├── pdf_generator.py           # Report format + PDF export
+│   ├── pdf_utils.py
+│   ├── data_pipeline.py
+│   ├── prediction.py              # ML models & feature engineering
+│   ├── ui_components/             # Sidebar, indicators
+│   ├── config.py
+│   ├── logging_config.py
+│   └── temp_manager.py
+└── tests/                         # Unit & integration tests
+```
+
+---
+
+
+# Extensibility & Customization
+
+- **Add a strategy:** Extend `src/trading_strategies.py`, update config and tests
+- **Add an indicator:** Implement in `src/indicators.py`, update sidebar selection rules
+- **Switch models:** `prediction.py` supports RandomForest, XGBoost, CatBoost ensemble
+- **Config:** Use `src/config.py` for timeouts, cache, endpoints, and strategy control
+
+---
+
+
+# Schema & Validation
+
+- Central JSON schema for AI outputs: `src/utils/ai_output_schema.py`
+- Strict required fields, optional fields allowed as `null`
+- Automatic adaptation layer for flat/nested outputs
+- Error recovery: readable fallback report if validation fails
+- **Benefit:** Prevents crashes from unexpected LLM outputs, simplifies auditing
+
+---
+
+
+# Testing & Reliability
+
+- **Unit tests:** Indicators, strategy logic, schema validation (`tests/`)
+- **Integration tests:** Data pipeline, AI output schema
+- **CI:** Run `pytest` + linters on PR, smoke tests for data fetch/report generation
+- **Observability:** Centralized logging, metrics for analysis duration/model latency/API failures
+- **Session State:** Namespaced keys for reproducibility
+
+---
+
+
+# Disclaimer & License
+
+- **For educational purposes only** — not financial advice
+- AI/LLM outputs are experimental; always verify before trading
+- Every exported report includes a risk/disclaimer block
+- Choose and declare a license (e.g., MIT) in `LICENSE` if open sourcing
+
+---
+
+
+## Appendix: Helpful Commands
+
+```bash
+# Run streamlit locally
+streamlit run app.py
+
+# Run Ollama (if using vision)
+ollama run llama3.2-vision
+```
+
+---
