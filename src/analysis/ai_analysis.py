@@ -324,7 +324,8 @@ def run_ai_analysis(daily_fig, timeframe_fig, data: pd.DataFrame, ticker: str, p
         vision_response = {'message': {'content': 'Vision analysis unavailable. Ollama service is not running. Please start Ollama and ensure llama3.2-vision model is installed.'}}
         
     # Only proceed with vision analysis if Ollama and model are available AND vision is enabled
-    if 'image_data' in locals() and vision_timeout > 0:
+    # if 'image_data' in locals() and vision_timeout > 0:
+    if 'image_data' in locals():
         # Create structured vision prompt
         current_price = data['Close'].iloc[-1]
         atr = data['ATR'].iloc[-1] if 'ATR' in data.columns and len(data) > 0 else current_price * 0.02
@@ -410,14 +411,15 @@ def run_ai_analysis(daily_fig, timeframe_fig, data: pd.DataFrame, ticker: str, p
                     'content': 'Vision analysis failed due to connection issues. Using AI agent analysis for trading insights.'
                 }
             }
-    else:
-        # Vision analysis is disabled or unavailable
-        if vision_timeout == 0:
-            log_step("Vision analysis disabled by user - using AI agent analysis only", emoji="📋")
-            vision_response = {'message': {'content': 'Vision analysis disabled. Analysis based on quantitative indicators and AI agent recommendations above.'}}
-        else:
-            log_step("Vision analysis unavailable - using AI agent analysis only", emoji="📋")
-            vision_response = {'message': {'content': 'Vision analysis unavailable. Analysis based on quantitative indicators and AI agent recommendations above.'}}
+    # May no longer need this else block since we handle all cases above
+    # else:
+    #     # Vision analysis is disabled or unavailable
+    #     if vision_timeout == 0:
+    #         log_step("Vision analysis disabled by user - using AI agent analysis only", emoji="📋")
+    #         vision_response = {'message': {'content': 'Vision analysis disabled. Analysis based on quantitative indicators and AI agent recommendations above.'}}
+    #     else:
+    #         log_step("Vision analysis unavailable - using AI agent analysis only", emoji="📋")
+    #         vision_response = {'message': {'content': 'Vision analysis unavailable. Analysis based on quantitative indicators and AI agent recommendations above.'}}
     
     # Helper function to format trade parameters in a more readable way
     def format_trade_params(params):

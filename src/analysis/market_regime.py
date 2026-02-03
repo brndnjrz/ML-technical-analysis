@@ -129,7 +129,7 @@ def detect_market_regime(data: pd.DataFrame) -> str:
         high_volatility = bb_width > 0.05 if bb_width is not None else volatility > 0.02
         low_volatility = bb_width < 0.02 if bb_width is not None else volatility < 0.01
         
-        # Regime classification - matching the regimes used in predict_next_day_close
+        # Regime classification - matching the regimes used in predict_next_period_close
         if bullish_trend:
             if high_volatility:
                 return "volatile_bullish"

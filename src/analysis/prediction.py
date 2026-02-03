@@ -283,8 +283,9 @@ def get_fundamental_metrics(ticker):
         st.warning(f"Could not fetch fundamentals: {e}")
         return {}
 
-def predict_next_day_close(data: pd.DataFrame, fundamentals: dict, selected_indicators: list) -> Tuple[float, float]:
-    """Predicts the next day's closing price using an ensemble of models for better accuracy."""
+def predict_next_period_close(data: pd.DataFrame, fundamentals: dict, selected_indicators: list, interval: str = '1d') -> Tuple[float, float]:
+    """Predicts the next period's closing price using an ensemble of models for better accuracy.
+    The 'period' is determined by the 'interval' parameter (e.g., '15m', '1h', '1d')."""
     try:
         # Input validation
         if data is None or data.empty:
@@ -788,7 +789,7 @@ def predict_next_day_close(data: pd.DataFrame, fundamentals: dict, selected_indi
             logger.info("=" * 50)
             logger.info("Prediction Summary:")
             logger.info(f"Current Price: ${current_price:.2f}")
-            logger.info(f"Predicted Next Day Close: ${predicted_price:.2f}")
+            logger.info(f"Predicted Next {interval} Close: ${predicted_price:.2f}")
             logger.info(f"Predicted Change: ${price_change:.2f} ({percent_change:.2f}%)")
             logger.info(f"Model Confidence: {confidence * 100:.2f}%")
             logger.info(f"Market Regime: {current_regime}")
@@ -824,7 +825,7 @@ def predict_next_day_close(data: pd.DataFrame, fundamentals: dict, selected_indi
         return None, None
                 
     except Exception as e:
-        logger.error(f"Error in predict_next_day_close: {str(e)}\nShape of data: {data.shape}")
+        logger.error(f"Error in predict_next_period_close: {str(e)}\nShape of data: {data.shape}")
         return None, None
 
 def create_strategy_features(data: pd.DataFrame, strategy_type: str) -> pd.DataFrame:
