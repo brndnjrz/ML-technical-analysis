@@ -8,7 +8,6 @@ class SessionKeys:
     ACTIVE_INDICATORS = "active_indicators"
     ANALYSIS_TYPE = "analysis_type"
     AI_ANALYSIS_RESULT = "ai_analysis_result"
-    AI_ANALYSIS_RUNNING = "ai_analysis_running"
     RUN_ANALYSIS = "run_analysis"
 
 # Technical Analysis Thresholds

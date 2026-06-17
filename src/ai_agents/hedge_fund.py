@@ -5,7 +5,6 @@ import numpy as np
 from .analyst import AnalystAgent
 from .strategy import StrategyAgent
 from .execution import ExecutionAgent
-from .backtest import BacktestAgent
 from ..trading_strategies import strategies_data
 from ..utils.metrics import log_prediction
 
@@ -20,8 +19,7 @@ class HedgeFundAI:
     - AnalystAgent: Market research and technical analysis
     - StrategyAgent: Strategy selection and optimization  
     - ExecutionAgent: Entry/exit timing and risk management
-    - BacktestAgent: Performance validation
-    
+
     The system uses ensemble decision-making and consensus-building to avoid conflicting recommendations.
     """
     
@@ -30,7 +28,6 @@ class HedgeFundAI:
         self.analyst = AnalystAgent(config)
         self.strategist = StrategyAgent(config)
         self.executor = ExecutionAgent(config)
-        self.backtester = BacktestAgent(config)
         # Load strategies database for enhanced recommendations
         self.strategies_db = {strategy['Strategy']: strategy for strategy in strategies_data}
         

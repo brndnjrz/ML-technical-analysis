@@ -4,6 +4,30 @@ import json
 import pandas as pd
 
 
+def format_trade_params(params: dict) -> str:
+    """Format a trade parameters dict into readable bullet lines."""
+    if not params:
+        return "No parameters available"
+    lines = []
+    for key, value in params.items():
+        k = key.replace('_', ' ').title()
+        if isinstance(value, dict):
+            lines.append(f"• {k}:")
+            for sk, sv in value.items():
+                lines.append(f"  • {sk.replace('_', ' ').title()}: {sv}")
+        elif isinstance(value, list):
+            lines.append(f"• {k}:")
+            for item in value:
+                lines.append(f"  • {item}")
+        elif isinstance(value, bool):
+            lines.append(f"• {k}: {'✅ Yes' if value else '❌ No'}")
+        elif isinstance(value, (int, float)) and any(t in key.lower() for t in ('price', 'stop', 'target')):
+            lines.append(f"• {k}: ${value:.2f}")
+        else:
+            lines.append(f"• {k}: {value}")
+    return '\n'.join(lines)
+
+
 def format_analysis_text(text):
     """Clean and format analysis text for better readability in professional report style"""
     if not text:
@@ -21,7 +45,7 @@ def format_analysis_text(text):
     text = text.replace('- -', '-')  # Fix double dashes
     
     # Format JSON trade parameters into readable format
-    def format_trade_params(match):
+    def _format_json_params(match):
         json_str = match.group(0)
         try:
             # Clean up the JSON string
@@ -52,7 +76,7 @@ def format_analysis_text(text):
             return json_str
     
     # Replace JSON blocks with formatted parameters
-    text = re.sub(r'\{[^}]*"[^"]*"[^}]*\}', format_trade_params, text)
+    text = re.sub(r'\{[^}]*"[^"]*"[^}]*\}', _format_json_params, text)
     
     # Ensure proper spacing around sections
     text = re.sub(r'([🤖📊💡📈👁️⚠️].+?)(\n)([^-•\s])', r'\1\n\n\3', text)
@@ -64,15 +88,15 @@ def format_professional_report(analysis, recommendation, ticker, strategy_type, 
     """Format analysis into a professional trade signal report"""
     # Get current market data
     current_price = data['Close'].iloc[-1] if not data.empty else 0
-    current_rsi = data.get('RSI', pd.Series([50])).iloc[-1] if 'RSI' in data.columns else 50
-    current_macd = data.get('MACD', pd.Series([0])).iloc[-1] if 'MACD' in data.columns else 0
-    current_adx = data.get('ADX', pd.Series([25])).iloc[-1] if 'ADX' in data.columns else 25
-    current_atr = data.get('ATR', pd.Series([1])).iloc[-1] if 'ATR' in data.columns else 1
-    current_vwap = data.get('VWAP', pd.Series([current_price])).iloc[-1] if 'VWAP' in data.columns else current_price
+    current_rsi = data['RSI'].iloc[-1] if 'RSI' in data.columns else 50
+    current_macd = data['MACD'].iloc[-1] if 'MACD' in data.columns else 0
+    current_adx = data['ADX'].iloc[-1] if 'ADX' in data.columns else 25
+    current_atr = data['ATR'].iloc[-1] if 'ATR' in data.columns else 1
+    current_vwap = data['VWAP'].iloc[-1] if 'VWAP' in data.columns else current_price
     
     # Get Bollinger Bands
-    bb_upper = data.get('BB_upper', pd.Series([current_price * 1.02])).iloc[-1] if 'BB_upper' in data.columns else current_price * 1.02
-    bb_lower = data.get('BB_lower', pd.Series([current_price * 0.98])).iloc[-1] if 'BB_lower' in data.columns else current_price * 0.98
+    bb_upper = data['BB_upper'].iloc[-1] if 'BB_upper' in data.columns else current_price * 1.02
+    bb_lower = data['BB_lower'].iloc[-1] if 'BB_lower' in data.columns else current_price * 0.98
     
     # Get support/resistance levels
     nearest_support = max([s for s in levels.get('support', []) if s < current_price], default=current_price * 0.95)

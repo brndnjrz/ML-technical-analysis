@@ -2,22 +2,21 @@ import pandas as pd
 from typing import Dict, Any
 import numpy as np
 import logging
-from ..trading_strategies import strategies_data, get_strategy_by_market_condition, get_strategy_by_risk_tolerance, get_strategy_by_timeframe
+from ..trading_strategies import get_strategy_by_market_condition, get_strategy_by_risk_tolerance, get_strategy_by_timeframe
+from .base import BaseAgent
 from ..utils.options_strategy_cheatsheet import OPTIONS_STRATEGY_CHEATSHEET
 
 # Setup logger
 logger = logging.getLogger(__name__)
 
-class StrategyAgent:
+class StrategyAgent(BaseAgent):
     """
     Agent responsible for developing and optimizing trading strategies based on
     market analysis and historical performance.
     """
     
     def __init__(self, config: Dict[str, Any] = None):
-        self.config = config or {}
-        # Load trading strategies data for intelligent strategy selection
-        self.strategies_db = {strategy['Strategy']: strategy for strategy in strategies_data}
+        super().__init__(config)
         self.available_strategies = list(self.strategies_db.keys())
         
     def develop_strategy(self, analysis: Dict[str, Any], data: pd.DataFrame, options_priority: bool = False, options_data: Dict = None) -> Dict[str, Any]:
@@ -500,28 +499,6 @@ class StrategyAgent:
     
     def _optimize_parameters(self, strategy: Dict[str, Any], data: pd.DataFrame) -> Dict[str, Any]:
         """Optimize strategy parameters based on historical data."""
-        try:
-            if strategy['name'] == 'Trend Following':
-                strategy['parameters'].update({
-                    'ma_period': self._optimize_ma_period(data),
-                    'stop_loss': self._calculate_stop_loss(data),
-                    'profit_target': self._calculate_profit_target(data)
-                })
-            elif strategy['name'] == 'Mean Reversion':
-                strategy['parameters'].update({
-                    'bb_period': self._optimize_bb_period(data),
-                    'bb_std': self._optimize_bb_std(data),
-                    'stop_loss': self._calculate_stop_loss(data)
-                })
-            elif strategy['name'] == 'Range Trading':
-                strategy['parameters'].update({
-                    'range_period': self._optimize_range_period(data),
-                    'stop_loss': self._calculate_stop_loss(data)
-                })
-                
-        except Exception as e:
-            print(f"Error optimizing parameters: {str(e)}")
-            
         return strategy
     
     def _add_risk_rules(self, strategy: Dict[str, Any], data: pd.DataFrame) -> Dict[str, Any]:

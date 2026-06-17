@@ -2,6 +2,7 @@
 import streamlit as st
 import logging
 import os
+import time
 from ..utils.app_config import ProgressSteps, UIConfig
 from ..utils.temp_manager import temp_manager
 from ..utils.workflow_logger import (
@@ -27,7 +28,7 @@ class AnalysisWorkflowManager:
         progress_bar = st.progress(0)
         status_text = st.empty()
         
-        if 'prompt' not in locals() or prompt is None:
+        if not prompt:
             prompt = "PROVIDE:"
         
         with st.spinner("🤖 AI is analyzing the market..."):
@@ -210,10 +211,8 @@ class AnalysisWorkflowManager:
         
         self.state_manager.set_ai_analysis_result(analysis, chart_path, final_strategy)
         self.state_manager.set_run_analysis(False)
-        self.state_manager.set_analysis_running(False)
-        
+
         # Clean up progress UI
-        import time
         time.sleep(1)
         progress_bar.empty()
         status_text.empty()
@@ -230,10 +229,8 @@ class AnalysisWorkflowManager:
         traceback.print_exc()
         
         self.state_manager.set_run_analysis(False)
-        self.state_manager.set_analysis_running(False)
-        
+
         # Clean up progress UI
-        import time
         time.sleep(1)
         progress_bar.empty()
         status_text.empty()

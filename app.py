@@ -4,6 +4,7 @@ import pandas as pd
 import os
 import logging
 import re
+import time
 from src.analysis.indicators import determine_trend
 from src import plotter
 from src.core.data_pipeline import fetch_and_process_data
@@ -17,23 +18,20 @@ from src.utils.temp_manager import temp_manager, cleanup_old_temp_files
 from src.utils.metrics import get_accuracy_report
 from src.utils.vision_plotter import create_vision_optimized_chart, export_chart_for_vision
 from src.utils.workflow_logger import (
-    log_section_start, log_section_end, 
-    log_subsection_start, log_subsection_end,
-    log_step, log_data_info, log_prediction, 
+    log_section_start, log_section_end,
+    log_step, log_data_info, log_prediction,
     log_model_performance, log_timer_start, log_timer_end,
     log_error
 )
 from src.pdf_utils import generate_and_display_pdf
 from src.ui_components import render_sidebar_quick_stats, sidebar_config, sidebar_indicator_selection
-from src.ui_components.analysis_results_display import render_analysis_results
 from src.trading_strategies import strategies_data, get_strategy_by_name
-from src.utils.formatters import format_analysis_text, format_professional_report
-from src.utils.app_config import SessionKeys, UIConfig, ProgressSteps, TechnicalThresholds, get_user_timeframe
+from src.utils.app_config import SessionKeys, UIConfig, ProgressSteps, TechnicalThresholds, get_user_timeframe, BASE_COLUMNS
 from src.utils.state_manager import AppStateManager
 from src.ui_components.tabs.technical_analysis import render_technical_analysis_tab
 from src.ui_components.tabs.ai_recommendation import render_ai_recommendation_tab
 from src.ui_components.tabs.analysis_results import render_analysis_results
-from src.ui_components.options_analysis_display import render_options_analysis_section
+from src.ui_components.options_analysis_display import render_options_analysis_section, get_options_context_for_ai
 from src.analysis.workflow_manager import AnalysisWorkflowManager
 from src.utils.prompt_generator import generate_analysis_prompt, build_market_context
 
@@ -47,8 +45,6 @@ logging.getLogger('requests').setLevel(logging.WARNING)
 
 # Clean up old temp files on startup
 cleanup_old_temp_files()
-
-# Text formatting functions moved to src.utils.formatters
 
 # Set Up Streamlit App UI 
 st.set_page_config(page_title=UIConfig.PAGE_TITLE, layout="wide")
@@ -164,7 +160,6 @@ if st.sidebar.button("🔄 Fetch & Analyze Data", type="primary"):
             st.sidebar.success(f"✅ Loaded {len(data)} {interval} candles for {ticker}")
             
             # Clear progress after 2 seconds
-            import time
             time.sleep(1)
             progress_bar.empty()
             status_text.empty()
@@ -188,8 +183,7 @@ if state_manager.has_stock_data():
     ticker_str = ticker.upper()
 
     # --- Options Strategy Analysis ---
-    from src.ui_components.options_analysis_display import get_options_context_for_ai
-    
+
     options_strategy_context = ""
     options_ai_vars = {}
     candidate_strategies = []
@@ -235,7 +229,6 @@ if state_manager.has_stock_data():
     )
     
     # Log indicator summary for debugging
-    from src.utils.app_config import BASE_COLUMNS
     indicator_columns = [col for col in data.columns if col not in BASE_COLUMNS]
     
     logging.info(f"📊 Dashboard loaded: {len(indicator_columns)} technical indicators calculated")
@@ -244,30 +237,24 @@ if state_manager.has_stock_data():
     # --- TAB 2: AI ANALYSIS ---
     with tab2:
         render_ai_recommendation_tab(state_manager)
-            
-    # Options analyzer functionality moved to modular components
 
-    # Build market context and generate appropriate prompt
-    from src.utils.prompt_generator import build_market_context, generate_analysis_prompt
-    from src.ui_components.options_analysis_display import render_options_analysis_section
-    
-    market_context = build_market_context(
-        ticker, interval, data, strategy_type, options_strategy, 
-        state_manager.get_active_indicators(), options_strategy_context
-    )
-    
-    prompt = generate_analysis_prompt(
-        analysis_type, strategy_type, market_context, interval, ticker
-    )
-    
     # Display options analysis section if needed
     if analysis_type == "Options Trading Strategy":
         render_options_analysis_section(data, options_data, ticker)
 
     # Run AI analysis synchronously using workflow manager
     if state_manager.should_run_analysis():
+        market_context = build_market_context(
+            ticker, interval, data, strategy_type, options_strategy,
+            state_manager.get_active_indicators(), options_strategy_context
+        )
+
+        prompt = generate_analysis_prompt(
+            analysis_type, strategy_type, market_context, interval, ticker
+        )
+
         workflow_manager = AnalysisWorkflowManager(state_manager)
-        
+
         workflow_manager.run_analysis_workflow(
             data=data,
             fundamentals=fundamentals, 
@@ -282,10 +269,6 @@ if state_manager.has_stock_data():
             subplot_fig=subplot_fig,
             interval=interval
         )
-
-    if state_manager.get_ai_analysis_result() is None and state_manager.is_analysis_running():
-        st.info("AI analysis started... Please wait.")
-        st.spinner("AI is analyzing the market...")
 
     if state_manager.get_ai_analysis_result():
         analysis, chart_path, recommendation = state_manager.get_ai_analysis_result()
@@ -303,8 +286,6 @@ if state_manager.has_stock_data():
             options_data=options_data,
             state_manager=state_manager
         )
-
-        state_manager.set_analysis_running(False)
 
 
 # --- SIDEBAR: QUICK STATS ---

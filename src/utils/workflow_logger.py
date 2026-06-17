@@ -6,6 +6,7 @@ more visible and trackable throughout the application.
 """
 
 import logging
+from contextlib import contextmanager
 from datetime import datetime
 
 def log_section_start(section_name):
@@ -176,3 +177,11 @@ def log_error(error_message, exception=None):
     if exception:
         logging.error(f"   - Exception: {str(exception)}")
         logging.debug(f"   - Exception type: {type(exception).__name__}")
+
+@contextmanager
+def timed_step(process_name: str):
+    start = log_timer_start(process_name)
+    try:
+        yield
+    finally:
+        log_timer_end(process_name, start)

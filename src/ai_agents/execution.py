@@ -1,17 +1,15 @@
 import pandas as pd
 from typing import Dict, Any, List, Tuple
 import numpy as np
-from ..trading_strategies import strategies_data
+from .base import BaseAgent
 
-class ExecutionAgent:
+class ExecutionAgent(BaseAgent):
     """
     Agent responsible for determining optimal entry/exit points and managing trade execution.
     """
     
     def __init__(self, config: Dict[str, Any] = None):
-        self.config = config or {}
-        # Load trading strategies for execution-specific rules
-        self.strategies_db = {strategy['Strategy']: strategy for strategy in strategies_data}
+        super().__init__(config)
         
     def generate_signals(self, strategy: Dict[str, Any], data: pd.DataFrame) -> Dict[str, Any]:
         print("[ExecutionAgent] Generating signals")

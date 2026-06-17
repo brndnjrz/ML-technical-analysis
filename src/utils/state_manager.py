@@ -74,17 +74,7 @@ class AppStateManager:
         """Clear AI analysis result from session state."""
         if SessionKeys.AI_ANALYSIS_RESULT in st.session_state:
             del st.session_state[SessionKeys.AI_ANALYSIS_RESULT]
-    
-    @staticmethod
-    def is_analysis_running():
-        """Check if AI analysis is currently running."""
-        return st.session_state.get(SessionKeys.AI_ANALYSIS_RUNNING, False)
-    
-    @staticmethod
-    def set_analysis_running(running):
-        """Set AI analysis running state."""
-        st.session_state[SessionKeys.AI_ANALYSIS_RUNNING] = running
-    
+
     @staticmethod
     def should_run_analysis():
         """Check if analysis should be run."""
@@ -105,7 +95,6 @@ class AppStateManager:
         """Clear all analysis-related state."""
         keys_to_clear = [
             SessionKeys.AI_ANALYSIS_RESULT,
-            SessionKeys.AI_ANALYSIS_RUNNING,
             SessionKeys.RUN_ANALYSIS
         ]
         for key in keys_to_clear:

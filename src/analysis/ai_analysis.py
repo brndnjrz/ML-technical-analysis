@@ -11,6 +11,7 @@ import time
 import logging
 from .vision_schema import parse_vision_analysis, create_vision_prompt_template
 from ..utils.options_strategy_cheatsheet import OPTIONS_STRATEGY_CHEATSHEET
+from ..utils.formatters import format_trade_params
 
 # Setup logger for AI analysis
 logger = logging.getLogger(__name__)
@@ -184,6 +185,7 @@ def run_ai_analysis(daily_fig, timeframe_fig, data: pd.DataFrame, ticker: str, p
     log_step("\nStarting visual chart analysis...", emoji="👁️")
     
     # Check if Ollama is available
+    image_data = None
     try:
         log_step("Checking Ollama connection...", emoji="🔌")
         # Try a simple ping to Ollama first
@@ -195,44 +197,18 @@ def run_ai_analysis(daily_fig, timeframe_fig, data: pd.DataFrame, ticker: str, p
         # Debug: print the response type (but not the full response to avoid clutter)
         log_step(f"Ollama response type: {type(test_response).__name__}", emoji="🔍")
         
-        # Check if vision model is available with safer access
         available_models = []
         try:
-            # Handle different response types from Ollama
-            if hasattr(test_response, 'models'):
-                # New Ollama response format with ListResponse object
-                for model in test_response.models:
-                    if hasattr(model, 'model'):
-                        available_models.append(model.model)
-                    elif hasattr(model, 'name'):
-                        available_models.append(model.name)
-                    else:
-                        available_models.append(str(model))
-            elif isinstance(test_response, dict):
-                # Legacy dictionary format
-                models_list = test_response.get('models', [])
-                for model in models_list:
-                    if isinstance(model, dict):
-                        # Try different possible keys for model name
-                        model_name = model.get('name') or model.get('model') or model.get('id') or str(model)
-                        if model_name:
-                            available_models.append(model_name)
-                    else:
-                        # Handle case where model is a string directly
-                        available_models.append(str(model))
-            else:
-                log_step(f"Unexpected response format: {type(test_response).__name__}", emoji="⚠️")
-                # Try to extract models from string representation as fallback
-                response_str = str(test_response)
-                if 'llama3.2-vision' in response_str:
-                    available_models.append('llama3.2-vision:latest')
-                
-        except Exception as model_parse_error:
-            log_step(f"Error parsing models list: {model_parse_error}", emoji="⚠️")
-            # Fallback: try to extract from string representation
-            response_str = str(test_response)
-            if 'llama3.2-vision' in response_str:
-                available_models.append('llama3.2-vision:latest')
+            models_raw = getattr(test_response, 'models', None) or test_response.get('models', [])
+            available_models = [
+                getattr(m, 'model', None) or getattr(m, 'name', None) or str(m)
+                for m in models_raw
+            ]
+            if not available_models and 'llama3.2-vision' in str(test_response):
+                available_models = ['llama3.2-vision:latest']
+        except Exception:
+            if 'llama3.2-vision' in str(test_response):
+                available_models = ['llama3.2-vision:latest']
         
         log_step(f"Available models: {available_models}", emoji="📋")
         
@@ -325,7 +301,7 @@ def run_ai_analysis(daily_fig, timeframe_fig, data: pd.DataFrame, ticker: str, p
         
     # Only proceed with vision analysis if Ollama and model are available AND vision is enabled
     # if 'image_data' in locals() and vision_timeout > 0:
-    if 'image_data' in locals():
+    if image_data is not None:
         # Create structured vision prompt
         current_price = data['Close'].iloc[-1]
         atr = data['ATR'].iloc[-1] if 'ATR' in data.columns and len(data) > 0 else current_price * 0.02
@@ -411,59 +387,7 @@ def run_ai_analysis(daily_fig, timeframe_fig, data: pd.DataFrame, ticker: str, p
                     'content': 'Vision analysis failed due to connection issues. Using AI agent analysis for trading insights.'
                 }
             }
-    # May no longer need this else block since we handle all cases above
-    # else:
-    #     # Vision analysis is disabled or unavailable
-    #     if vision_timeout == 0:
-    #         log_step("Vision analysis disabled by user - using AI agent analysis only", emoji="📋")
-    #         vision_response = {'message': {'content': 'Vision analysis disabled. Analysis based on quantitative indicators and AI agent recommendations above.'}}
-    #     else:
-    #         log_step("Vision analysis unavailable - using AI agent analysis only", emoji="📋")
-    #         vision_response = {'message': {'content': 'Vision analysis unavailable. Analysis based on quantitative indicators and AI agent recommendations above.'}}
-    
-    # Helper function to format trade parameters in a more readable way
-    def format_trade_params(params):
-        if not params:
-            return "No parameters available"
-            
-        formatted_params = []
-        for key, value in params.items():
-            # Format the key nicely
-            formatted_key = key.replace('_', ' ').title()
-            
-            # Format the value based on its type
-            if isinstance(value, dict):
-                # Handle nested dictionaries (like risk_management)
-                formatted_params.append(f"• {formatted_key}:")
-                for subkey, subvalue in value.items():
-                    formatted_subkey = subkey.replace('_', ' ').title()
-                    if isinstance(subvalue, list):
-                        formatted_params.append(f"  • {formatted_subkey}:")
-                        for item in subvalue:
-                            formatted_params.append(f"    • {item}")
-                    else:
-                        formatted_params.append(f"  • {formatted_subkey}: {subvalue}")
-            elif isinstance(value, list):
-                # Handle lists
-                formatted_params.append(f"• {formatted_key}:")
-                for item in value:
-                    formatted_params.append(f"  • {item}")
-            elif isinstance(value, bool):
-                # Format boolean values
-                formatted_value = "✅ Yes" if value else "❌ No"
-                formatted_params.append(f"• {formatted_key}: {formatted_value}")
-            elif isinstance(value, (int, float)):
-                # Format numeric values
-                if 'price' in key.lower() or 'stop' in key.lower() or 'target' in key.lower():
-                    formatted_params.append(f"• {formatted_key}: ${value:.2f}")
-                else:
-                    formatted_params.append(f"• {formatted_key}: {value}")
-            else:
-                # Format all other values
-                formatted_params.append(f"• {formatted_key}: {value}")
-                
-        return '\n'.join(formatted_params)
-    
+
     # Combine both analyses with enhanced vision output
     log_step("Combining AI analysis results", emoji="🔄")
     vision_content = "Vision analysis unavailable"

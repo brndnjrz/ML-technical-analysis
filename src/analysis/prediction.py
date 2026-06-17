@@ -16,6 +16,10 @@ import logging
 logger = logging.getLogger(__name__)
 
 from .market_regime import generate_regime_specific_features, detect_market_regime, volatility_regime_features
+from .adaptive_features import engineer_adaptive_features, get_adaptive_periods, add_lag_features
+from .preprocessing import create_preprocessing_pipeline, create_target_variable, handle_missing_values
+from .adaptive_models import get_adaptive_model_config, calculate_adaptive_ensemble_weights
+from .enhanced_validation import get_adaptive_cv_strategy, validate_prediction_performance, select_best_models
 
 def engineer_features(data: pd.DataFrame) -> pd.DataFrame:
     """Create advanced technical and price action features for prediction."""
@@ -333,16 +337,31 @@ def predict_next_period_close(data: pd.DataFrame, fundamentals: dict, selected_i
                 df[key] = 0
                 fundamental_cols.append(key)
         
-        # Engineer features with error handling
+        # Engineer features with enhanced adaptive approach
         try:
-            df = engineer_features(df)
+            logger.info(f"Starting adaptive feature engineering for {interval} interval")
+            df = engineer_adaptive_features(df, interval)
+            
+            # Add original features as fallback if adaptive fails
+            if len([col for col in df.columns if col not in data.columns]) < 5:
+                logger.warning("Adaptive feature engineering produced few features, adding fallback features")
+                df = engineer_features(df)
+                
         except Exception as feature_error:
-            logger.warning(f"Feature engineering failed: {feature_error}. Using basic features.")
-            # Fallback to basic features if engineering fails
-            df['Returns'] = df['Close'].pct_change().fillna(0)
-            df['SMA_5'] = df['Close'].rolling(5).mean().fillna(df['Close'])
-            df['SMA_10'] = df['Close'].rolling(10).mean().fillna(df['Close'])
-            df['Volume_MA'] = df['Volume'].rolling(5).mean().fillna(df['Volume']) if 'Volume' in df.columns else df['Close'] * 0
+            logger.warning(f"Adaptive feature engineering failed: {feature_error}. Using basic features.")
+            try:
+                df = engineer_features(df)
+            except Exception as basic_error:
+                logger.warning(f"Basic feature engineering also failed: {basic_error}. Using fallback.")
+                # Fallback to basic features if engineering fails
+                df['Returns'] = df['Close'].pct_change().fillna(0)
+                periods = get_adaptive_periods(interval)
+                df['SMA_short'] = df['Close'].rolling(periods['short']).mean().fillna(df['Close'])
+                df['SMA_medium'] = df['Close'].rolling(periods['medium']).mean().fillna(df['Close'])
+                if 'Volume' in df.columns:
+                    df['Volume_MA'] = df['Volume'].rolling(periods['volume_window']).mean().fillna(df['Volume'])
+                else:
+                    df['Volume_MA'] = df['Close'] * 0
         
         # Calculate additional selected indicators with error handling
         if "RSI" in selected_indicators and "RSI" not in df.columns:
@@ -392,7 +411,14 @@ def predict_next_period_close(data: pd.DataFrame, fundamentals: dict, selected_i
             logger.error("No feature columns available for prediction")
             return None, None
         
-        df = df.assign(Target=df['Close'].shift(-1))
+        # Create adaptive target variable
+        df = create_target_variable(df, interval)
+        target_type = df.get('Target_Type', pd.Series(['absolute'])).iloc[0] if not df.empty else 'absolute'
+        logger.info(f"Using target type: {target_type}")
+        
+        # Add lag features for the target
+        if 'Target' in df.columns:
+            df = add_lag_features(df, 'Returns', interval)
         
         # Filter out any completely empty feature columns
         valid_feature_cols = []
@@ -493,242 +519,153 @@ def predict_next_period_close(data: pd.DataFrame, fundamentals: dict, selected_i
             logger.error("No training data available after split")
             return None, None
         
-        # Create and train model with cross-validation and ensemble methods
+        # Create and train model with adaptive configuration and enhanced validation
         try:
-            # Set up cross-validation
-            tscv = TimeSeriesSplit(n_splits=5)
+            # Get adaptive model configurations
+            model_configs = get_adaptive_model_config(interval)
+            
+            # Set up adaptive cross-validation
+            cv_strategy = get_adaptive_cv_strategy(len(X_train), interval)
             
             # Detect current market regime for adaptive modeling
             last_n_rows = df.iloc[-30:] if len(df) >= 30 else df
             current_regime = detect_market_regime(last_n_rows)
             logger.info(f"Current market regime detected: {current_regime}")
             
-            # Double check for any non-numeric feature columns
-            for col in list(feature_cols):  # Use list to make a copy before modifying
+            # Apply preprocessing
+            try:
+                preprocessor = create_preprocessing_pipeline(feature_cols, interval)
+                X_train_processed = preprocessor.fit_transform(X_train)
+                X_test_processed = preprocessor.transform(X_test) if len(X_test) > 0 else None
+                
+                # Convert back to DataFrame with proper column names
+                feature_names = preprocessor.get_feature_names_out()
+                X_train_processed = pd.DataFrame(X_train_processed, columns=feature_names, index=X_train.index)
+                if X_test_processed is not None:
+                    X_test_processed = pd.DataFrame(X_test_processed, columns=feature_names, index=X_test.index)
+                    
+            except Exception as prep_error:
+                logger.warning(f"Preprocessing failed: {prep_error}. Using original features.")
+                X_train_processed = X_train
+                X_test_processed = X_test
+            
+            # Create models with adaptive configurations
+            models = {}
+            for model_name, config in model_configs.items():
                 try:
-                    # Check if the column is a Series and has a dtype property
-                    if isinstance(df[col], pd.Series) and hasattr(df[col], 'dtype'):
-                        if df[col].dtype.kind not in 'biufc':  # boolean, integer, unsigned int, float, complex
-                            feature_cols.remove(col)
-                            logger.warning(f"Removing non-numeric column from features: {col} with dtype {df[col].dtype}")
-                    else:
-                        # Handle DataFrame or other object types
-                        feature_cols.remove(col)
-                        logger.warning(f"Removing column that is not a Series: {col} of type {type(df[col])}")
-                except Exception as e:
-                    # If accessing dtype causes an error, remove the column
-                    if col in feature_cols:
-                        feature_cols.remove(col)
-                    logger.warning(f"Error checking column {col}: {e}, removing from features")
-                    
-            # Convert any remaining problematic columns to numeric
-            for col in list(feature_cols):  # Use list to make a copy before modifying
-                try:
-                    if isinstance(df[col], pd.Series) and hasattr(df[col], 'dtype'):
-                        if df[col].dtype == 'object':
-                            logger.warning(f"Converting object column to numeric: {col}")
-                            df[col] = pd.to_numeric(df[col], errors='coerce')
-                            if df[col].isna().sum() > 0:
-                                df[col] = df[col].fillna(0)
-                    else:
-                        # If it's not a Series with a dtype, remove it
-                        feature_cols.remove(col)
-                        logger.warning(f"Removed column {col} as it's not a proper numeric Series")
-                except Exception as e:
-                    # If any error occurs while processing, remove the column
-                    if col in feature_cols:
-                        feature_cols.remove(col)
-                    logger.warning(f"Error processing column {col}: {e}, removing from features")
+                    if model_name == 'RandomForest':
+                        models[model_name] = RandomForestRegressor(**config)
+                    elif model_name == 'XGBoost':
+                        models[model_name] = XGBRegressor(**config)
+                    elif model_name == 'CatBoost':
+                        models[model_name] = CatBoostRegressor(**config)
+                except Exception as model_error:
+                    logger.warning(f"Error creating {model_name}: {model_error}")
+                    continue
             
-            # Ensure 'Market_Regime' is not used directly as a feature if it's a string
-            if 'Market_Regime' in feature_cols:
-                feature_cols.remove('Market_Regime')
-                logger.info("Removed 'Market_Regime' string column from features")
+            # Enhanced cross-validation
+            validation_results = validate_prediction_performance(
+                models, X_train_processed, y_train, cv_strategy, interval
+            )
             
-            # Create models for ensemble approach with regime-specific adjustments
-            # Always using all three models for better prediction accuracy
-            models = {
-                'RandomForest': create_model("RandomForest"),
-                'XGBoost': create_model("XGBoost"),
-                'CatBoost': create_model("CatBoost")
-            }
+            # Select best models and calculate adaptive weights
+            best_model_names = select_best_models(validation_results, interval)
+            best_models = {name: models[name] for name in best_model_names if name in models}
             
-            # Apply regime-specific parameter adjustments
-            if current_regime == 'volatile_bullish':
-                models['XGBoost'] = create_model("XGBoost", {'learning_rate': 0.05, 'max_depth': 7})
-            elif current_regime == 'volatile_bearish':
-                models['XGBoost'] = create_model("XGBoost", {'learning_rate': 0.02, 'max_depth': 5})
-            elif current_regime == 'range_bound':
-                models['RandomForest'] = create_model("RandomForest", {'max_depth': 10, 'min_samples_split': 8})
-                
-            # Add a final check for any string or object columns in X_train
-            # This will prevent the "could not convert string to float" error
-            categorical_cols = []
-            for col in X_train.columns:
-                try:
-                    # Check if column is a Series and has dtype before accessing
-                    if isinstance(X_train[col], pd.Series) and hasattr(X_train[col], 'dtype'):
-                        if X_train[col].dtype == 'object' or (isinstance(X_train[col].iloc[0], str) if len(X_train) > 0 else False):
-                            categorical_cols.append(col)
-                    else:
-                        # If not a Series with dtype, treat as categorical and remove
-                        categorical_cols.append(col)
-                        logger.warning(f"Column {col} is not a Series with dtype attribute: {type(X_train[col])}")
-                except Exception as e:
-                    # If any error occurs, add to categorical columns to be removed
-                    categorical_cols.append(col)
-                    logger.warning(f"Error checking column {col}: {e}, will be removed from training data")
-                    
-            if categorical_cols:
-                # Remove duplicates from categorical_cols list
-                categorical_cols = list(set(categorical_cols))
-                logger.warning(f"Found categorical columns that will cause training errors: {categorical_cols}")
-                # Remove these columns from X_train and X_test
-                X_train = X_train.drop(columns=categorical_cols)
-                X_test = X_test.drop(columns=categorical_cols)
-                logger.info(f"Removed {len(categorical_cols)} problematic categorical columns from training data")
+            if not best_models:
+                logger.warning("No valid models found, using fallback")
+                best_models = {'RandomForest': RandomForestRegressor(random_state=42)}
+                validation_results = {'RandomForest': [{'rmse': 1.0}]}
             
-            # Handle infinite and extremely large values
-            logger.info("Checking for infinite and extremely large values...")
-            
-            # Replace infinite values with NaN first
-            X_train = X_train.replace([np.inf, -np.inf], np.nan)
-            X_test = X_test.replace([np.inf, -np.inf], np.nan)
-            
-            # Check for any remaining infinite values
-            inf_cols = []
-            for col in X_train.columns:
-                if np.isinf(X_train[col]).any():
-                    inf_cols.append(col)
-            
-            if inf_cols:
-                logger.warning(f"Found columns with infinite values: {inf_cols}")
-                X_train[inf_cols] = X_train[inf_cols].replace([np.inf, -np.inf], np.nan)
-                X_test[inf_cols] = X_test[inf_cols].replace([np.inf, -np.inf], np.nan)
-            
-            # Fill NaN values with median for each column
-            for col in X_train.columns:
-                if X_train[col].isna().any():
-                    median_val = X_train[col].median()
-                    if pd.isna(median_val):
-                        median_val = 0  # If median is also NaN, use 0
-                    X_train[col] = X_train[col].fillna(median_val)
-                    X_test[col] = X_test[col].fillna(median_val)
-                    logger.info(f"Filled NaN values in {col} with median: {median_val}")
-            
-            # Clip extremely large values to prevent float32 overflow
-            # float32 max value is approximately 3.4e38
-            max_val = 1e30  # Use a conservative upper bound
-            min_val = -1e30
-            
-            for col in X_train.columns:
-                if X_train[col].abs().max() > max_val:
-                    logger.warning(f"Clipping extremely large values in column {col}")
-                    X_train[col] = X_train[col].clip(lower=min_val, upper=max_val)
-                    X_test[col] = X_test[col].clip(lower=min_val, upper=max_val)
-            
-            logger.info(f"Final training data shape: {X_train.shape}")
-            logger.info(f"Final test data shape: {X_test.shape}")
-            
-            # Cross-validate and train each model
-            cv_scores = {}
-            predictions = {}
-            model_weights = {}
-            
-            # Train each model with cross-validation
-            for name, model in models.items():
-                cv_score = []
-                
-                # Cross-validation
-                for train_idx, val_idx in tscv.split(X_train):
-                    # Time-series safe split
-                    X_cv_train, X_cv_val = X_train.iloc[train_idx], X_train.iloc[val_idx]
-                    y_cv_train, y_cv_val = y_train.iloc[train_idx], y_train.iloc[val_idx]
-                    
-                    # Train on subset
-                    model.fit(X_cv_train, y_cv_train)
-                    
-                    # Score
-                    y_cv_pred = model.predict(X_cv_val)
-                    rmse = np.sqrt(mean_squared_error(y_cv_val, y_cv_pred))
-                    cv_score.append(rmse)
-                
-                # Store average CV score
-                avg_cv_score = np.mean(cv_score)
-                cv_scores[name] = avg_cv_score
-                
-                # Train final model on all training data
-                model.fit(X_train, y_train)
-                
-                # Calculate model weight (inverse of RMSE - better models get higher weights)
-                model_weights[name] = 1.0 / (avg_cv_score + 1e-10)  # Avoid division by zero
+            # Calculate adaptive ensemble weights
+            model_weights = calculate_adaptive_ensemble_weights(validation_results, {}, interval)
             
             # Apply regime-specific model weight adjustments
             if current_regime == 'volatile_bullish':
-                # In volatile bullish markets, favor XGBoost and CatBoost
-                model_weights['XGBoost'] *= 1.3
-                model_weights['CatBoost'] *= 1.2
+                # In volatile bullish markets, favor models that handle noise well
+                if 'CatBoost' in model_weights:
+                    model_weights['CatBoost'] *= 1.2
+                if 'XGBoost' in model_weights:
+                    model_weights['XGBoost'] *= 1.1
             elif current_regime == 'volatile_bearish':
-                # In volatile bearish markets, give more weight to CatBoost
-                model_weights['CatBoost'] *= 1.5
+                # In volatile bearish markets, give more weight to robust models
+                if 'CatBoost' in model_weights:
+                    model_weights['CatBoost'] *= 1.5
             elif current_regime == 'range_bound':
                 # In range-bound markets, favor RandomForest
-                model_weights['RandomForest'] *= 1.4
-            elif current_regime == 'trending_bullish':
-                # In trending bullish markets, favor XGBoost
-                model_weights['XGBoost'] *= 1.3
-            elif current_regime == 'trending_bearish':
-                # In trending bearish markets, balance weights
-                pass
-                
-            # Log cross-validation results with regime information
-            logger.info(f"Cross-validation RMSE scores: {cv_scores}")
-            logger.info(f"Market regime-adjusted weights for {current_regime} regime")
+                if 'RandomForest' in model_weights:
+                    model_weights['RandomForest'] *= 1.4
             
-            # Normalize weights to sum to 1
+            # Normalize weights
             total_weight = sum(model_weights.values())
-            for name in model_weights:
-                model_weights[name] /= total_weight
-                
-            logger.info(f"Model weights: {model_weights}")
+            if total_weight > 0:
+                model_weights = {name: weight/total_weight for name, weight in model_weights.items()}
+            
+            logger.info(f"Final model weights for {current_regime} regime: {model_weights}")
+            
+            # Train final models on full training data
+            for name, model in best_models.items():
+                try:
+                    model.fit(X_train_processed, y_train)
+                except Exception as train_error:
+                    logger.warning(f"Training failed for {name}: {train_error}")
+                    if name in model_weights:
+                        del model_weights[name]
             
             # Get last row for prediction
             last_row = X.iloc[[-1]]
+            try:
+                last_row_processed = preprocessor.transform(last_row)
+                last_row_processed = pd.DataFrame(last_row_processed, columns=feature_names, index=last_row.index)
+            except:
+                last_row_processed = last_row[feature_cols]
             
             # Make predictions with each model
-            for name, model in models.items():
+            predictions = {}
+            for name, model in best_models.items():
                 try:
-                    pred = model.predict(last_row)[0]
+                    pred = model.predict(last_row_processed)[0]
                     predictions[name] = pred
                     logger.info(f"Model {name} prediction: {pred:.4f}")
                 except Exception as pred_error:
                     logger.warning(f"Model {name} prediction failed: {pred_error}")
-                    predictions[name] = None
+                    if name in model_weights:
+                        del model_weights[name]
             
-            # Filter out failed predictions
-            valid_predictions = {name: pred for name, pred in predictions.items() if pred is not None}
+            # Filter out failed predictions and recalculate weights
+            valid_predictions = {name: pred for name, pred in predictions.items() if name in model_weights}
             if not valid_predictions:
                 logger.error("All model predictions failed")
                 return None, None
             
-            # Recalculate weights considering only valid predictions
-            valid_weights = {name: model_weights[name] for name in valid_predictions}
-            total_valid_weight = sum(valid_weights.values())
-            for name in valid_weights:
-                valid_weights[name] /= total_valid_weight
+            # Renormalize weights for valid predictions
+            valid_weight_sum = sum(model_weights[name] for name in valid_predictions)
+            if valid_weight_sum > 0:
+                for name in valid_predictions:
+                    model_weights[name] /= valid_weight_sum
             
             # Ensemble prediction (weighted average)
-            predicted_price = sum(valid_predictions[name] * valid_weights[name] for name in valid_predictions)
+            predicted_price = sum(valid_predictions[name] * model_weights[name] for name in valid_predictions)
+            
+            # Convert prediction based on target type
+            current_price = df['Close'].iloc[-1]
+            if target_type == 'percentage':
+                # Convert percentage change back to price
+                predicted_price = current_price * (1 + predicted_price / 100)
+            elif target_type == 'atr_normalized':
+                # Convert ATR-normalized change back to price
+                atr = df.get('ATR', pd.Series([current_price * 0.02])).iloc[-1]
+                predicted_price = current_price + (predicted_price * atr)
+            # For absolute target, predicted_price is already the target price
             
             # Store the best performing model for reference
-            best_model_name = min(cv_scores, key=cv_scores.get)
-            model = models[best_model_name]
-            logger.info(f"Best model: {best_model_name} (RMSE: {cv_scores[best_model_name]:.4f})")
+            best_model_name = max(model_weights, key=model_weights.get) if model_weights else 'Unknown'
+            logger.info(f"Best model: {best_model_name}")
             logger.info(f"Individual predictions: {valid_predictions}")
             logger.info(f"Ensemble prediction: {predicted_price:.4f}")
             
         except Exception as model_error:
-            logger.error(f"Model training failed: {model_error}")
+            logger.error(f"Adaptive model training failed: {model_error}")
             return None, None
         
         # Validate prediction result
@@ -736,42 +673,62 @@ def predict_next_period_close(data: pd.DataFrame, fundamentals: dict, selected_i
             logger.error(f"Invalid predicted price: {predicted_price}")
             return None, None
         
-        # Calculate confidence based on recent prediction accuracy with regime adjustment
-        if len(X_test) > 0 and len(y_test) > 0:
+        # Calculate confidence based on recent prediction accuracy with adaptive regime adjustment
+        if len(X_test) > 0 and len(y_test) > 0 and X_test_processed is not None:
             # Get ensemble predictions for test set
             test_predictions = {}
-            for name, model in models.items():
-                test_predictions[name] = model.predict(X_test)
+            for name, model in best_models.items():
+                if name in model_weights:
+                    try:
+                        test_predictions[name] = model.predict(X_test_processed)
+                    except Exception as test_pred_error:
+                        logger.warning(f"Test prediction failed for {name}: {test_pred_error}")
+                        continue
             
-            # Calculate weighted ensemble predictions for test set
-            ensemble_test_preds = np.zeros_like(y_test)
-            for name in models:
-                ensemble_test_preds += test_predictions[name] * model_weights[name]
-            
-            # Calculate MSE for ensemble predictions
-            mse = mean_squared_error(y_test, ensemble_test_preds)
-            mean_actual = y_test.mean()
-            
-            # Base confidence calculation
-            if mean_actual > 0:
-                base_confidence = max(0.0, min(1.0, 1.0 - (np.sqrt(mse) / mean_actual)))
+            if test_predictions:
+                # Calculate weighted ensemble predictions for test set
+                ensemble_test_preds = np.zeros_like(y_test)
+                for name in test_predictions:
+                    if name in model_weights:
+                        ensemble_test_preds += test_predictions[name] * model_weights[name]
+                
+                # Calculate timeframe-specific confidence metrics
+                if interval in ['1m', '5m', '15m', '30m']:
+                    # For short timeframes, use directional accuracy as primary confidence metric
+                    directional_accuracy = np.mean(np.sign(ensemble_test_preds) == np.sign(y_test))
+                    base_confidence = directional_accuracy
+                    
+                    # Add hit rate component
+                    threshold = np.std(y_test) * 0.5
+                    hit_rate = np.mean(np.abs(ensemble_test_preds - y_test) <= threshold)
+                    base_confidence = (directional_accuracy * 0.7 + hit_rate * 0.3)
+                    
+                else:
+                    # For longer timeframes, use normalized RMSE
+                    mse = mean_squared_error(y_test, ensemble_test_preds)
+                    mean_actual = np.abs(y_test).mean()
+                    
+                    if mean_actual > 0:
+                        base_confidence = max(0.0, min(1.0, 1.0 - (np.sqrt(mse) / mean_actual)))
+                    else:
+                        base_confidence = 0.5  # Default confidence
+                
+                # Adjust confidence based on market regime and timeframe
+                regime_confidence_adjustments = {
+                    'trending_bullish': 0.08 if interval in ['1h', '4h', '1d'] else 0.05,
+                    'trending_bearish': 0.05 if interval in ['1h', '4h', '1d'] else 0.03,
+                    'volatile_bullish': -0.10 if interval in ['1m', '5m'] else -0.05,
+                    'volatile_bearish': -0.15 if interval in ['1m', '5m'] else -0.08,
+                    'range_bound': 0.0
+                }
+                
+                # Apply regime-specific confidence adjustment
+                regime_adjustment = regime_confidence_adjustments.get(current_regime, 0.0)
+                confidence = max(0.1, min(0.95, base_confidence + regime_adjustment))
+                
+                logger.info(f"Base confidence: {base_confidence:.2f}, Regime adjustment: {regime_adjustment:.2f}")
             else:
-                base_confidence = 0.5  # Default confidence
-            
-            # Adjust confidence based on market regime
-            regime_confidence_adjustments = {
-                'trending_bullish': 0.10,   # Higher confidence in trending markets
-                'trending_bearish': 0.05,
-                'volatile_bullish': -0.05,  # Lower confidence in volatile markets
-                'volatile_bearish': -0.10,
-                'range_bound': 0.0          # No adjustment for range-bound markets
-            }
-            
-            # Apply regime-specific confidence adjustment
-            regime_adjustment = regime_confidence_adjustments.get(current_regime, 0.0)
-            confidence = max(0.1, min(0.95, base_confidence + regime_adjustment))
-            
-            logger.info(f"Base confidence: {base_confidence:.2f}, Regime adjustment: {regime_adjustment:.2f}")
+                confidence = 0.5  # Default if no test predictions
         else:
             confidence = 0.5  # Default confidence if no test data
         

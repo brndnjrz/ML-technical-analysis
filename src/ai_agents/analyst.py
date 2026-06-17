@@ -2,21 +2,19 @@ import pandas as pd
 import numpy as np
 from typing import Dict, Any, List
 import logging
-from ..trading_strategies import strategies_data
+from .base import BaseAgent
 
 # Setup logger
 logger = logging.getLogger(__name__)
 
-class AnalystAgent:
+class AnalystAgent(BaseAgent):
     """
     Agent responsible for technical and fundamental analysis of market data.
     Provides comprehensive market analysis and identifies patterns/trends.
     """
     
     def __init__(self, config: Dict[str, Any] = None):
-        self.config = config or {}
-        # Load strategies for context-aware analysis
-        self.strategies_db = {strategy['Strategy']: strategy for strategy in strategies_data}
+        super().__init__(config)
     
     def analyze_technical_indicators(self, data: pd.DataFrame) -> Dict[str, Any]:
         logger.debug("📈 Analyzing technical indicators")
