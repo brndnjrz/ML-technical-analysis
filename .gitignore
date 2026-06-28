@@ -1,0 +1,51 @@
+
+# ── Python ───────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+
+# ── Virtual environments ──────────────────────────────────────────────────────
+venv/
+.venv/
+env/
+
+# ── Environment / secrets ─────────────────────────────────────────────────────
+.env
+.env.*
+
+# ── macOS ─────────────────────────────────────────────────────────────────────
+.DS_Store
+
+# ── Editor ────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+
+# ── ML artifacts ──────────────────────────────────────────────────────────────
+catboost_info/
+
+# ── Scratch / temp ────────────────────────────────────────────────────────────
+temp/
+archive/
+troubleshooting.txt
+
+# ── Old source files (superseded) ────────────────────────────────────────────
+schema_validation.py
+src/ai_agents.py
+
+# ── Test scratch files ────────────────────────────────────────────────────────
+tests/
+test_formatting.py
+test_report.md
+test_prediction_improvements.py
+
+# ── Private notes / draft docs ────────────────────────────────────────────────
+Notes.md
+ModelConfig.md
+oldREADME.md
+aiFlowchart.md
+indicators.md
+WORKFLOW_LOGGING.md
+PROJECT_STRUCTURE.md
+
+# ── Runtime data ──────────────────────────────────────────────────────────────
+metrics/accuracy_log.jsonl
